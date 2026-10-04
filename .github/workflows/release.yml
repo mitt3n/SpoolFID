@@ -45,6 +45,16 @@ jobs:
           echo "name=${TAG#v}" >> "$GITHUB_OUTPUT"
           echo "code=$(( 10#${BASH_REMATCH[1]} * 10000 + 10#${BASH_REMATCH[2]} * 100 + 10#${BASH_REMATCH[3]} ))" >> "$GITHUB_OUTPUT"
 
+      # The release notes are this version's section of CHANGELOG.md. Fail early if it hasn't been written.
+      - name: Extract the release notes
+        run: |
+          awk -v v="${{ steps.ver.outputs.name }}" '$1 == "##" && $2 == v { found = 1; next } $1 == "##" && found { exit } found' CHANGELOG.md > release-notes.md
+          if ! grep -q '[^[:space:]]' release-notes.md; then
+            echo "::error::CHANGELOG.md has no '## ${{ steps.ver.outputs.name }}' section. Add one before tagging."
+            exit 1
+          fi
+          cat release-notes.md
+
       - name: Restore the signing keystore
         env:
           KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
@@ -81,4 +91,4 @@ jobs:
           files: |
             SpoolFID-${{ steps.ver.outputs.tag }}.apk
             SpoolFID-${{ steps.ver.outputs.tag }}.apk.sha256
-          generate_release_notes: true
+          body_path: release-notes.md
