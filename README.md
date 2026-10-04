@@ -67,6 +67,7 @@ list. Your choice is remembered.
 | **Untagged** | Spools with no tags yet. |
 | **Partly tagged** | Spools with some tags but not all (only shown when two tags per spool are on). |
 | **Fully tagged** | Spools that have every tag they need. |
+| **Not linked** | Spools tagged with an earlier version whose tags aren't linked in Spoolman yet. Only shown while there are some. |
 
 The search box works together with the chips, and any spools you've selected stay visible while you change
 filters.
@@ -171,9 +172,13 @@ those. If Spoolman has no weight for it, 1000 g is assumed.
 
 ### Upgrading from 1.0
 Version 1.0 didn't link tags in Spoolman; it only kept a count in a custom "CFS tags written" field. Tags you
-wrote then work fine in the printer, but Spoolman doesn't know about them yet. Hold each one to the phone on the
-**Read** tab and tap **Link to #N** to add it. Once everything is linked you can delete the old field in
-Spoolman under Settings → Extra Fields.
+wrote then work fine in the printer, and SpoolFID still remembers them: those spools show **"2 tags · not
+linked"** and count as tagged, so they stay out of your **To do** list. Spoolman just doesn't know which physical
+tags they are yet.
+
+To link them, use the **Not linked** chip to see which spools are left, then hold each of their tags to the phone
+on the **Read** tab and tap **Link to #N**. Once a tag is linked, Spoolman's own tag list takes over the count
+for that spool. When everything is linked you can delete the old field in Spoolman under Settings → Extra Fields.
 
 ### Needs a connection
 SpoolFID needs to reach Spoolman while you use it. There's no offline mode.

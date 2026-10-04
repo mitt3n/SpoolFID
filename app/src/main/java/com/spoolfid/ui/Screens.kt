@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
@@ -259,7 +260,14 @@ private fun SpoolListScreen(vm: AppViewModel) {
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             // "Partly tagged" only means something when a spool needs more than one tag.
-            TagFilter.entries.filter { it != TagFilter.PARTIAL || vm.requiredTags > 1 }.forEach { f ->
+            // "Not linked" appears while some spools still have tags that Spoolman doesn't know about.
+            TagFilter.entries.filter { f ->
+                when (f) {
+                    TagFilter.PARTIAL -> vm.requiredTags > 1
+                    TagFilter.NOT_LINKED -> vm.countFor(f) > 0 || vm.tagFilter == f
+                    else -> true
+                }
+            }.forEach { f ->
                 FilterChip(
                     selected = vm.tagFilter == f,
                     onClick = { vm.updateTagFilter(f) },
@@ -363,7 +371,7 @@ private fun SpoolRow(
             )
         }
         if (spool.tagCount > 0) {
-            TagBadge(spool.tagCount, requiredTags)
+            TagBadge(spool.tagCount, requiredTags, spool.unlinkedCount)
             Spacer(Modifier.width(8.dp))
         }
         if (selecting) Checkbox(checked = selected, onCheckedChange = null)
@@ -372,19 +380,32 @@ private fun SpoolRow(
 
 /** Green when the spool has all the tags it should, amber when only some are written. */
 @Composable
-private fun TagBadge(count: Int, required: Int) {
+private fun TagBadge(count: Int, required: Int, unlinked: Int) {
     val done = count >= required
-    val color = if (done) SuccessGreen else WarnAmber
+    // Tags known only from an earlier version: counted, but still to be linked in Spoolman.
+    val color = when {
+        unlinked > 0 -> MaterialTheme.colorScheme.tertiary
+        done -> SuccessGreen
+        else -> WarnAmber
+    }
     Row(verticalAlignment = Alignment.CenterVertically) {
         Icon(
-            if (done) Icons.Default.CheckCircle else Icons.Default.Warning,
+            when {
+                unlinked > 0 -> Icons.Default.Info
+                done -> Icons.Default.CheckCircle
+                else -> Icons.Default.Warning
+            },
             contentDescription = null,
             modifier = Modifier.size(18.dp),
             tint = color,
         )
         Spacer(Modifier.width(4.dp))
         Text(
-            if (done) "$count tag${if (count == 1) "" else "s"}" else "$count/$required tags",
+            when {
+                unlinked > 0 -> "$count tag${if (count == 1) "" else "s"} · not linked"
+                done -> "$count tag${if (count == 1) "" else "s"}"
+                else -> "$count/$required tags"
+            },
             color = color,
             style = MaterialTheme.typography.labelMedium,
         )

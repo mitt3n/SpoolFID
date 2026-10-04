@@ -11,14 +11,21 @@ enum class TagFilter(val label: String) {
     PARTIAL("Partly tagged"),
 
     /** All the tags needed. */
-    TAGGED("Fully tagged");
+    TAGGED("Fully tagged"),
 
-    /** Whether a spool with [tagCount] tags passes, when [required] tags make a spool fully tagged. */
-    fun matches(tagCount: Int, required: Int): Boolean = when (this) {
+    /** Tagged with an earlier version, but the tags aren't linked in Spoolman yet. */
+    NOT_LINKED("Not linked");
+
+    /**
+     * Whether a spool with [tagCount] tags passes, when [required] tags make a spool fully tagged.
+     * [unlinked] is how many of its tags are only known from the old record and not linked in Spoolman.
+     */
+    fun matches(tagCount: Int, required: Int, unlinked: Int = 0): Boolean = when (this) {
         ALL -> true
         TO_DO -> tagCount < required
         UNTAGGED -> tagCount == 0
         PARTIAL -> tagCount in 1 until required
         TAGGED -> tagCount >= required
+        NOT_LINKED -> unlinked > 0
     }
 }

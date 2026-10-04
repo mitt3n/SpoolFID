@@ -48,6 +48,21 @@ class TagFilterTest {
     }
 
     @Test
+    fun notLinkedShowsSpoolsWhoseTagsSpoolmanDoesntKnowAbout() {
+        assertTrue(TagFilter.NOT_LINKED.matches(tagCount = 2, required = 2, unlinked = 2))
+        assertFalse(TagFilter.NOT_LINKED.matches(tagCount = 2, required = 2, unlinked = 0))
+        assertFalse(TagFilter.NOT_LINKED.matches(tagCount = 0, required = 2))
+    }
+
+    @Test
+    fun anUnlinkedSpoolStillCountsAsTaggedForTheOtherFilters() {
+        // A spool tagged with 1.0 (two tags, none linked) must not show up under "To do" or "Untagged".
+        assertFalse(TagFilter.TO_DO.matches(2, 2, unlinked = 2))
+        assertFalse(TagFilter.UNTAGGED.matches(2, 2, unlinked = 2))
+        assertTrue(TagFilter.TAGGED.matches(2, 2, unlinked = 2))
+    }
+
+    @Test
     fun toDoIsTheComplementOfFullyTagged() {
         for (required in 1..3) for (count in 0..4) {
             assertEquals(!TagFilter.TAGGED.matches(count, required), TagFilter.TO_DO.matches(count, required))

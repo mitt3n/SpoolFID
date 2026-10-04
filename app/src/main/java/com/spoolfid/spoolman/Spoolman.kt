@@ -35,8 +35,14 @@ data class Spool(
 ) {
     val title: String get() = filamentName?.takeIf { it.isNotBlank() } ?: "Spool $id"
 
-    /** Spoolman is the source of truth: the number of tags it has linked (or the legacy count on old servers). */
-    val tagCount: Int get() = if (tagsSupported) tags.size else legacyTagCount
+    /**
+     * Spoolman is the source of truth: the tags it has linked. A spool with none linked yet falls back to the count
+     * SpoolFID 1.0 recorded, which is how tags written before linking existed are remembered.
+     */
+    val tagCount: Int get() = if (tagsSupported && tags.isNotEmpty()) tags.size else legacyTagCount
+
+    /** Tags known only from the old 1.0 record, not yet linked in Spoolman. */
+    val unlinkedCount: Int get() = if (tagsSupported && tags.isEmpty()) legacyTagCount else 0
 
     fun hasTag(uid: String): Boolean = tags.any { it.uid.equals(uid, ignoreCase = true) }
 }

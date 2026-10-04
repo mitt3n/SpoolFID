@@ -223,14 +223,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** How many spools each tag filter would show, for the chip labels. */
-    fun countFor(f: TagFilter): Int = spools.count { f.matches(it.tagCount, requiredTags) }
+    fun countFor(f: TagFilter): Int = spools.count { f.matches(it.tagCount, requiredTags, it.unlinkedCount) }
 
     // ---- Spool list / selection ----
 
     fun visibleSpools(): List<Spool> {
         val q = query.trim().lowercase()
         return spools.filter { s ->
-            (tagFilter.matches(s.tagCount, requiredTags) || s.id in selection) &&
+            (tagFilter.matches(s.tagCount, requiredTags, s.unlinkedCount) || s.id in selection) &&
                 (q.isEmpty() || listOfNotNull("#${s.id}", s.title, s.vendor, s.material, s.location)
                     .any { it.lowercase().contains(q) })
         }

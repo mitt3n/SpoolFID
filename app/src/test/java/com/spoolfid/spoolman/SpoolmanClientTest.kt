@@ -197,13 +197,41 @@ class SpoolmanClientTest {
     }
 
     @Test
-    fun nativeTagsOverrideAnyLegacyCount() {
-        // A spool from SpoolFID 1.0.x still has the custom field, but Spoolman's own list is what counts.
+    fun tagsWrittenByVersionOneAreRememberedButMarkedNotLinked() {
+        // SpoolFID 1.0 only kept a count in a custom field. Until tags are linked, that count stands in for them,
+        // so already-tagged spools aren't shown as untagged.
         respond("GET /api/v1/spool", 200 to "[${spoolJson(2, extra = """{"cfs_tags":"2"}""", tags = "[]")}]")
         val s = client().listSpools().single()
         assertTrue(s.tagsSupported)
+        assertEquals(2, s.tagCount)
+        assertEquals(2, s.unlinkedCount)
+    }
+
+    @Test
+    fun onceTagsAreLinkedSpoolmansListTakesOverFromTheOldCount() {
+        respond(
+            "GET /api/v1/spool",
+            200 to "[${spoolJson(2, extra = """{"cfs_tags":"2"}""", tags = "[${tagJson("AA11BB22")}]")}]",
+        )
+        val s = client().listSpools().single()
+        assertEquals(1, s.tagCount)
+        assertEquals(0, s.unlinkedCount)
+    }
+
+    @Test
+    fun aSpoolWithNoRecordAtAllIsUntagged() {
+        respond("GET /api/v1/spool", 200 to "[${spoolJson(2)}]")
+        val s = client().listSpools().single()
         assertEquals(0, s.tagCount)
-        assertEquals(2, s.legacyTagCount)
+        assertEquals(0, s.unlinkedCount)
+    }
+
+    @Test
+    fun onOlderServersNothingCountsAsUnlinked() {
+        respond("GET /api/v1/spool", 200 to "[${spoolJson(2, extra = """{"cfs_tags":"2"}""", tags = null)}]")
+        val s = client().listSpools().single()
+        assertEquals(2, s.tagCount)
+        assertEquals(0, s.unlinkedCount)
     }
 
     @Test
