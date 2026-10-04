@@ -20,6 +20,9 @@ import com.spoolfid.nfc.toHex
 import com.spoolfid.spoolman.Spool
 import com.spoolfid.spoolman.SpoolmanClient
 import com.spoolfid.spoolman.SpoolmanException
+import com.spoolfid.spoolman.TagLink
+import com.spoolfid.spoolman.TagLinkStatus
+import com.spoolfid.spoolman.TagMove
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -75,8 +78,13 @@ sealed interface ReadState {
     data class Result(
         val uid: String,
         val contents: TagContents,
-        val spool: Spool?,
-        val lookupNote: String?,
+        /** How the tag relates to Spoolman's tag links; null if Spoolman couldn't be asked. */
+        val link: TagLinkStatus?,
+        /** The server can link tags (Spoolman 0.27+). */
+        val canLink: Boolean,
+        val note: String?,
+        /** A link was just made from this screen. */
+        val justLinked: String? = null,
     ) : ReadState
 }
 
@@ -102,7 +110,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var read by mutableStateOf<ReadState>(ReadState.Idle); private set
 
     var url by mutableStateOf(settings.spoolmanUrl)
-    var markWritten by mutableStateOf(settings.markWritten); private set
+    var linkTags by mutableStateOf(settings.linkTags); private set
     var confirmOverwrite by mutableStateOf(settings.confirmOverwrite); private set
     var twoTagsPerSpool by mutableStateOf(settings.twoTagsPerSpool); private set
     var keepScreenOn by mutableStateOf(settings.keepScreenOn); private set
@@ -147,24 +155,46 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Re-sync with Spoolman when the app comes back to the foreground (not mid-session). */
+    fun onResumed() {
+        if (configured && session == null && !loading) refresh()
+    }
+
+    /** Whether the connected Spoolman can link tags (Spoolman 0.27+). Null until we've seen a spool. */
+    private fun tagLinkingSupported(): Boolean? = spools.firstOrNull()?.tagsSupported
+
     fun saveSettings() {
         settings.spoolmanUrl = url
         url = settings.spoolmanUrl
         settingsStatus = "Connecting..."
         viewModelScope.launch {
-            runCatching { withContext(Dispatchers.IO) { client().listSpools() } }
-                .onSuccess {
-                    spools = it.sortedBy { s -> s.id }
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val c = client()
+                    c.info() to c.listSpools()
+                }
+            }
+                .onSuccess { (info, list) ->
+                    spools = list.sortedBy { s -> s.id }
                     loadError = null
-                    settingsStatus = "Connected - ${it.size} spools"
+                    val linking = when (list.firstOrNull()?.tagsSupported) {
+                        true -> "tag linking available"
+                        false -> "older Spoolman: tags can't be linked"
+                        null -> null
+                    }
+                    settingsStatus = listOfNotNull(
+                        "Connected" + (info.version?.let { " to Spoolman $it" } ?: ""),
+                        "${list.size} spools",
+                        linking,
+                    ).joinToString(" - ")
                 }
                 .onFailure { settingsStatus = describe(it) }
         }
     }
 
-    fun updateMarkWritten(v: Boolean) {
-        markWritten = v
-        settings.markWritten = v
+    fun updateLinkTags(v: Boolean) {
+        linkTags = v
+        settings.linkTags = v
     }
 
     fun updateKeepScreenOn(v: Boolean) {
@@ -314,14 +344,36 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 val prev = result.getOrNull()?.previousSpoolId
                 if (prev != null && prev > 1 && prev != spool.id) notes += "Replaced spool #$prev"
 
-                // Tags written for this spool so far in this session; shown in the list and kept in Spoolman.
-                val count = s.copy + 1
-                spools = spools.map {
-                    if (it.id == spool.id) it.copy(tagCount = count, extra = it.extra + (SpoolmanClient.TAGS_FIELD to count.toString())) else it
-                }
-                if (settings.markWritten) {
-                    runCatching { withContext(Dispatchers.IO) { client().setTagCount(spool, count) } }
-                        .onFailure { notes += "Couldn't update Spoolman: ${describe(it)}" }
+                // Spoolman is the source of truth: link the tag there and show the spool as Spoolman now has it.
+                if (settings.linkTags) {
+                    val count = s.copy + 1
+                    runCatching {
+                        withContext(Dispatchers.IO) { client().recordTag(spool, uid, count) }
+                    }
+                        .onSuccess { record ->
+                            val fresh = record.spool
+                            if (fresh != null) {
+                                spools = spools.map { if (it.id == fresh.id) fresh else it }
+                            } else {
+                                // Older server: the count went into a custom field, so mirror it locally.
+                                spools = spools.map {
+                                    if (it.id == spool.id) {
+                                        it.copy(
+                                            legacyTagCount = count,
+                                            extra = it.extra + (SpoolmanClient.TAGS_FIELD to count.toString()),
+                                        )
+                                    } else {
+                                        it
+                                    }
+                                }
+                            }
+                            when (val moved = record.moved) {
+                                is TagMove.FromSpool -> notes += "Tag was linked to spool #${moved.spoolId} in Spoolman - moved here"
+                                is TagMove.FromFilament -> notes += "Tag was linked to filament #${moved.filamentId} in Spoolman - moved here"
+                                TagMove.None -> Unit
+                            }
+                        }
+                        .onFailure { notes += "Couldn't link the tag in Spoolman: ${describe(it)}" }
                 }
 
                 session = s.copy(
@@ -354,15 +406,74 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     return@launch
                 }
                 feedback(true)
-                val id = (r.contents as? TagContents.Written)?.payload?.spoolId
-                var spool: Spool? = null
-                var note: String? = null
-                if (id != null && id >= 1 && configured) {
-                    runCatching { withContext(Dispatchers.IO) { client().getSpool(id) } }
-                        .onSuccess { spool = it; if (it == null) note = "Spool #$id not found in Spoolman" }
-                        .onFailure { note = describe(it) }
+                val tagSpoolId = (r.contents as? TagContents.Written)?.payload?.spoolId?.takeIf { it >= 1 }
+                read = lookUp(r.uid, r.contents, tagSpoolId)
+            } finally {
+                busy = false
+            }
+        }
+    }
+
+    /** Asks Spoolman what it has linked for this tag, and for the spool the tag names. */
+    private suspend fun lookUp(
+        uid: String,
+        contents: TagContents,
+        tagSpoolId: Int?,
+        justLinked: String? = null,
+    ): ReadState.Result {
+        if (!configured || contents == TagContents.Blank) {
+            return ReadState.Result(uid, contents, null, false, null, justLinked)
+        }
+        return runCatching {
+            withContext(Dispatchers.IO) {
+                val c = client()
+                val linked = c.spoolsWithTag(uid).firstOrNull()
+                val named = when {
+                    tagSpoolId == null -> null
+                    linked?.id == tagSpoolId -> linked
+                    else -> c.getSpool(tagSpoolId)
                 }
-                read = ReadState.Result(r.uid, r.contents, spool, note)
+                Triple(linked, named, TagLink.classify(tagSpoolId, linked, named))
+            }
+        }.fold(
+            onSuccess = { (linked, named, status) ->
+                val supported = (linked ?: named)?.tagsSupported ?: tagLinkingSupported() ?: false
+                ReadState.Result(uid, contents, status, supported, null, justLinked)
+            },
+            onFailure = { ReadState.Result(uid, contents, null, false, describe(it), justLinked) },
+        )
+    }
+
+    /** Links the tag on screen to the spool it names, moving it if Spoolman has it on another spool. */
+    fun linkReadTag() {
+        val r = read as? ReadState.Result ?: return
+        val spoolId = when (val l = r.link) {
+            is TagLinkStatus.NotLinked -> l.tagSpoolId
+            is TagLinkStatus.Mismatch -> l.tagSpoolId
+            else -> null
+        } ?: return
+        if (busy) return
+        busy = true
+        viewModelScope.launch {
+            try {
+                val outcome = runCatching { withContext(Dispatchers.IO) { client().linkTag(spoolId, r.uid) } }
+                val error = outcome.exceptionOrNull()
+                if (error != null) {
+                    read = r.copy(note = "Couldn't link the tag: ${describe(error)}")
+                    feedback(false)
+                    return@launch
+                }
+                feedback(true)
+                val moved = when (val m = outcome.getOrThrow()) {
+                    is TagMove.FromSpool -> " (moved from spool #${m.spoolId})"
+                    is TagMove.FromFilament -> " (moved from filament #${m.filamentId})"
+                    TagMove.None -> ""
+                }
+                read = lookUp(r.uid, r.contents, spoolId, justLinked = "Linked to spool #$spoolId$moved")
+                // Keep the spool list in step with Spoolman.
+                runCatching { withContext(Dispatchers.IO) { client().getSpool(spoolId) } }.getOrNull()?.let { fresh ->
+                    spools = spools.map { if (it.id == fresh.id) fresh else it }
+                }
             } finally {
                 busy = false
             }

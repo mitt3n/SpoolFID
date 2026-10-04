@@ -6,7 +6,11 @@ import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.MalformedURLException
 import java.net.URL
+import java.net.URLEncoder
 import java.net.UnknownHostException
+
+/** An NFC/RFID tag linked to a spool in Spoolman (Spoolman 0.27+). */
+data class SpoolTag(val uid: String, val format: String?)
 
 data class Spool(
     val id: Int,
@@ -18,17 +22,38 @@ data class Spool(
     val initialWeight: Double?,
     val remainingWeight: Double?,
     val location: String?,
-    /** Tags written for this spool in its latest write session (0 = none). */
-    val tagCount: Int,
     /** Raw extra fields: values are JSON-encoded strings, as Spoolman stores them. */
     val extra: Map<String, String>,
     /** The filament has several colors, so [colorHex] is just the first of them. */
     val multiColor: Boolean = false,
+    /** Tags Spoolman has linked to this spool. */
+    val tags: List<SpoolTag> = emptyList(),
+    /** The server reports native tags. Older Spoolman versions don't have the field at all. */
+    val tagsSupported: Boolean = false,
+    /** Count kept in a custom extra field by older SpoolFID versions; only used when the server has no native tags. */
+    val legacyTagCount: Int = 0,
 ) {
     val title: String get() = filamentName?.takeIf { it.isNotBlank() } ?: "Spool $id"
+
+    /** Spoolman is the source of truth: the number of tags it has linked (or the legacy count on old servers). */
+    val tagCount: Int get() = if (tagsSupported) tags.size else legacyTagCount
+
+    fun hasTag(uid: String): Boolean = tags.any { it.uid.equals(uid, ignoreCase = true) }
 }
 
 class SpoolmanException(message: String) : Exception(message)
+
+class ServerInfo(val version: String?)
+
+/** Where a tag was linked before it was moved to a different spool. */
+sealed interface TagMove {
+    data object None : TagMove
+    data class FromSpool(val spoolId: Int) : TagMove
+    data class FromFilament(val filamentId: Int) : TagMove
+}
+
+/** The outcome of recording a freshly written tag: the spool as Spoolman now has it, and any link that moved. */
+class TagRecord(val spool: Spool?, val moved: TagMove)
 
 class HttpResponse(val code: Int, val body: String)
 
@@ -65,19 +90,75 @@ class SpoolmanClient(rawUrl: String, private val transport: HttpTransport = UrlC
     private val base: String = normalize(rawUrl)
     private var fieldEnsured = false
 
-    fun listSpools(): List<Spool> {
-        val arr = JSONArray(request("GET", "/api/v1/spool?allow_archived=false"))
-        return (0 until arr.length()).map { parseSpool(arr.getJSONObject(it)) }
-    }
+    /** The server's version, for the connection check. */
+    fun info(): ServerInfo = ServerInfo(JSONObject(request("GET", "/api/v1/info")).str("version"))
+
+    fun listSpools(): List<Spool> = parseSpools(request("GET", "/api/v1/spool?allow_archived=false"))
 
     fun getSpool(id: Int): Spool? = try {
         parseSpool(JSONObject(request("GET", "/api/v1/spool/$id")))
     } catch (e: SpoolmanException) {
-        if (e.message?.contains("404") == true) null else throw e
+        if (e.message?.contains("HTTP 404") == true) null else throw e
     }
 
-    /** Sets the integer extra field [TAGS_FIELD] on the spool, registering the field first if needed. */
-    fun setTagCount(spool: Spool, count: Int) {
+    /**
+     * The spools that have [uid] linked (archived ones included). Servers without tag support ignore the filter
+     * and return everything, so the result is always checked against each spool's own tag list.
+     */
+    fun spoolsWithTag(uid: String): List<Spool> =
+        parseSpools(request("GET", "/api/v1/spool?allow_archived=true&tag=${URLEncoder.encode(uid, "UTF-8")}"))
+            .filter { it.hasTag(uid) }
+
+    /**
+     * Links [uid] to the spool. A tag identifies exactly one spool or filament, so if something else already holds it
+     * the link is moved here (and the old holder is reported).
+     */
+    fun linkTag(spoolId: Int, uid: String, format: String = TAG_FORMAT): TagMove {
+        val body = JSONObject().put("uid", uid).put("format", format).toString()
+        val path = "/api/v1/spool/$spoolId/tag"
+        val first = send("POST", path, body)
+        if (first.code in 200..299) return TagMove.None
+        if (first.code != 409) throw failure(first)
+
+        // Already linked somewhere: re-linking to the same spool is a no-op, otherwise move it.
+        val conflict = runCatching { JSONObject(first.body) }.getOrNull() ?: throw failure(first)
+        val heldBySpool = conflict.int("spool_id")
+        val heldByFilament = conflict.int("filament_id")
+        if (heldBySpool == spoolId) return TagMove.None
+        val move = when {
+            heldBySpool != null -> {
+                requireOk(send("DELETE", "/api/v1/spool/$heldBySpool/tag/$uid", null))
+                TagMove.FromSpool(heldBySpool)
+            }
+            heldByFilament != null -> {
+                requireOk(send("DELETE", "/api/v1/filament/$heldByFilament/tag/$uid", null))
+                TagMove.FromFilament(heldByFilament)
+            }
+            else -> throw failure(first)
+        }
+        requireOk(send("POST", path, body))
+        return move
+    }
+
+    fun unlinkTag(spoolId: Int, uid: String) {
+        requireOk(send("DELETE", "/api/v1/spool/$spoolId/tag/$uid", null))
+    }
+
+    /**
+     * Records a tag that was just written. On Spoolman with native tags the tag is linked and the spool is re-read,
+     * so what's shown is exactly what Spoolman holds. On older servers the count goes in a custom field instead.
+     */
+    fun recordTag(spool: Spool, uid: String, sessionCount: Int): TagRecord =
+        if (spool.tagsSupported) {
+            val moved = linkTag(spool.id, uid)
+            TagRecord(getSpool(spool.id), moved)
+        } else {
+            setLegacyTagCount(spool, sessionCount)
+            TagRecord(null, TagMove.None)
+        }
+
+    /** Fallback for servers without native tags: the count lives in an integer extra field. */
+    fun setLegacyTagCount(spool: Spool, count: Int) {
         ensureField()
         val extra = JSONObject()
         spool.extra.forEach { (k, v) -> extra.put(k, v) }
@@ -96,21 +177,38 @@ class SpoolmanClient(rawUrl: String, private val transport: HttpTransport = UrlC
         fieldEnsured = true
     }
 
-    private fun request(method: String, path: String, body: String? = null): String {
-        val response = try {
-            transport.send(method, base + path, body)
-        } catch (e: MalformedURLException) {
-            throw SpoolmanException("Invalid Spoolman URL")
-        } catch (e: UnknownHostException) {
-            throw SpoolmanException("Unknown host - check the Spoolman address")
-        } catch (e: IOException) {
-            throw SpoolmanException("Can't reach Spoolman at $base\n(${e.javaClass.simpleName}: ${e.message})")
-        }
-        if (response.code !in 200..299) throw SpoolmanException("Spoolman returned HTTP ${response.code}")
-        return response.body
+    /** Sends a request and returns whatever the server answered, whatever the status. */
+    private fun send(method: String, path: String, body: String?): HttpResponse = try {
+        transport.send(method, base + path, body)
+    } catch (e: MalformedURLException) {
+        throw SpoolmanException("Invalid Spoolman URL")
+    } catch (e: UnknownHostException) {
+        throw SpoolmanException("Unknown host - check the Spoolman address")
+    } catch (e: IOException) {
+        throw SpoolmanException("Can't reach Spoolman at $base\n(${e.javaClass.simpleName}: ${e.message})")
+    }
+
+    private fun request(method: String, path: String, body: String? = null): String =
+        requireOk(send(method, path, body)).body
+
+    private fun requireOk(response: HttpResponse): HttpResponse {
+        if (response.code !in 200..299) throw failure(response)
+        return response
+    }
+
+    /** An error carrying the status and, when Spoolman explains itself, its message. */
+    private fun failure(response: HttpResponse): SpoolmanException {
+        val detail = runCatching {
+            val o = JSONObject(response.body)
+            o.str("message") ?: o.str("detail")
+        }.getOrNull()
+        return SpoolmanException("Spoolman returned HTTP ${response.code}" + (detail?.let { ": $it" } ?: ""))
     }
 
     companion object {
+        /** The tag format recorded in Spoolman; "creality" is one of the formats it lists. */
+        const val TAG_FORMAT = "creality"
+
         const val TAGS_FIELD = "cfs_tags"
 
         /** Earlier versions stored a boolean "cfs_tag" (one tag); still read as a count of 1. */
@@ -125,6 +223,12 @@ class SpoolmanClient(rawUrl: String, private val transport: HttpTransport = UrlC
 
         private fun JSONObject.str(key: String): String? = if (isNull(key)) null else getString(key)
         private fun JSONObject.num(key: String): Double? = if (isNull(key)) null else getDouble(key)
+        private fun JSONObject.int(key: String): Int? = if (isNull(key)) null else getInt(key)
+
+        private fun parseSpools(json: String): List<Spool> {
+            val arr = JSONArray(json)
+            return (0 until arr.length()).map { parseSpool(arr.getJSONObject(it)) }
+        }
 
         private fun parseSpool(o: JSONObject): Spool {
             val f = o.optJSONObject("filament")
@@ -135,6 +239,10 @@ class SpoolmanClient(rawUrl: String, private val transport: HttpTransport = UrlC
             // Multi-color filaments have no color_hex, only a comma-separated multi_color_hexes.
             val single = f?.str("color_hex")?.takeIf { it.isNotBlank() }
             val firstOfMany = f?.str("multi_color_hexes")?.split(",")?.map { it.trim() }?.firstOrNull { it.isNotEmpty() }
+            val tagArray = o.optJSONArray("tags")
+            val tags = (0 until (tagArray?.length() ?: 0)).mapNotNull { i ->
+                tagArray!!.optJSONObject(i)?.let { t -> t.str("uid")?.let { uid -> SpoolTag(uid, t.str("format")) } }
+            }
             return Spool(
                 id = o.getInt("id"),
                 filamentName = f?.str("name"),
@@ -146,9 +254,11 @@ class SpoolmanClient(rawUrl: String, private val transport: HttpTransport = UrlC
                 initialWeight = o.num("initial_weight"),
                 remainingWeight = o.num("remaining_weight"),
                 location = o.str("location"),
-                tagCount = extra[TAGS_FIELD]?.trim('"')?.toIntOrNull()
-                    ?: if (extra[LEGACY_FIELD] == "true") 1 else 0,
                 extra = extra,
+                tags = tags,
+                tagsSupported = o.has("tags"),
+                legacyTagCount = extra[TAGS_FIELD]?.trim('"')?.toIntOrNull()
+                    ?: if (extra[LEGACY_FIELD] == "true") 1 else 0,
             )
         }
     }

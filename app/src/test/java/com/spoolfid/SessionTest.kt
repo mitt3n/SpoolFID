@@ -11,7 +11,7 @@ class SessionTest {
     private fun spool(id: Int) = Spool(
         id = id, filamentName = "S$id", vendor = null, material = "PLA", colorHex = "FFFFFF",
         filamentWeight = 1000.0, initialWeight = null, remainingWeight = null, location = null,
-        tagCount = 0, extra = emptyMap(),
+        extra = emptyMap(),
     )
 
     private fun session(spools: Int, copies: Int) =

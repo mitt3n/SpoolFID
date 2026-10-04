@@ -27,8 +27,8 @@ android {
         minSdk = 26
         targetSdk = 36
         // The release workflow derives both from the git tag (v1.2.3 -> "1.2.3" / 10203).
-        versionCode = (findProperty("versionCodeOverride") as String?)?.toIntOrNull() ?: 10000
-        versionName = (findProperty("versionNameOverride") as String?)?.takeIf { it.isNotBlank() } ?: "1.0.0"
+        versionCode = (findProperty("versionCodeOverride") as String?)?.toIntOrNull() ?: 10100
+        versionName = (findProperty("versionNameOverride") as String?)?.takeIf { it.isNotBlank() } ?: "1.1.0"
     }
 
     signingConfigs {

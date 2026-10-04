@@ -90,6 +90,7 @@ import com.spoolfid.Session
 import com.spoolfid.Tab
 import com.spoolfid.nfc.TagContents
 import com.spoolfid.spoolman.Spool
+import com.spoolfid.spoolman.TagLinkStatus
 import kotlin.math.roundToInt
 
 private val SuccessGreen = Color(0xFF2E7D32)
@@ -175,7 +176,8 @@ private fun Swatch(hex: String?, size: androidx.compose.ui.unit.Dp) {
 }
 
 private fun Spool.subtitle(): String =
-    listOfNotNull(vendor, material, remainingWeight?.let { "${it.roundToInt()} g left" }).joinToString(" · ")
+    listOfNotNull(vendor, material, remainingWeight?.let { "${it.roundToInt()} g left" }, location?.takeIf { it.isNotBlank() })
+        .joinToString(" · ")
 
 @Composable
 private fun NfcBanner(status: NfcStatus) {
@@ -528,14 +530,14 @@ private fun ReadScreen(vm: AppViewModel) {
                     Icon(Icons.Default.Warning, null, tint = MaterialTheme.colorScheme.error)
                     Text(r.message, color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center)
                 }
-                is ReadState.Result -> ReadResultCard(r)
+                is ReadState.Result -> ReadResultCard(r, onLink = { vm.linkReadTag() })
             }
         }
     }
 }
 
 @Composable
-private fun ReadResultCard(r: ReadState.Result) {
+private fun ReadResultCard(r: ReadState.Result, onLink: () -> Unit) {
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text("UID ${r.uid}", fontFamily = FontFamily.Monospace, fontSize = 13.sp)
@@ -564,14 +566,61 @@ private fun ReadResultCard(r: ReadState.Result) {
                     }
                 }
             }
-            r.spool?.let { s ->
-                HorizontalDivider()
-                Text("In Spoolman", style = MaterialTheme.typography.labelMedium)
-                Text("#${s.id}  ${s.title}", style = MaterialTheme.typography.titleMedium)
-                Text(s.subtitle(), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            r.justLinked?.let { Text(it, color = SuccessGreen, style = MaterialTheme.typography.titleSmall) }
+            if (r.link != null || r.note != null) HorizontalDivider()
+            when (val l = r.link) {
+                is TagLinkStatus.Linked -> SpoolmanSpool("Linked in Spoolman", l.spool, ok = true)
+                is TagLinkStatus.Mismatch -> {
+                    Text(
+                        (l.tagSpoolId?.let { "The tag says spool #$it, but " } ?: "The tag names no spool, but ") +
+                            "Spoolman has it linked to:",
+                        color = WarnAmber,
+                    )
+                    SpoolmanSpool(null, l.linked, ok = false)
+                    if (l.tagSpoolId != null && r.canLink) {
+                        Button(onClick = onLink) { Text("Link to #${l.tagSpoolId} instead") }
+                    }
+                }
+                is TagLinkStatus.NotLinked -> {
+                    Text("Not linked in Spoolman yet", color = WarnAmber, style = MaterialTheme.typography.titleSmall)
+                    if (l.spool != null) {
+                        SpoolmanSpool("The tag names", l.spool, ok = false)
+                        if (r.canLink) Button(onClick = onLink) { Text("Link to #${l.tagSpoolId}") }
+                    } else {
+                        Text("Spool #${l.tagSpoolId} doesn't exist in Spoolman", color = WarnAmber)
+                    }
+                    if (!r.canLink) {
+                        Text("This Spoolman can't link tags (it needs version 0.27 or newer).", style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+                TagLinkStatus.Unknown -> Text("Not known to Spoolman")
+                null -> Unit
             }
-            r.lookupNote?.let { Text(it, color = WarnAmber) }
+            r.note?.let { Text(it, color = WarnAmber) }
         }
+    }
+}
+
+/** A Spoolman spool shown inside the read card, with how many tags Spoolman has linked to it. */
+@Composable
+private fun SpoolmanSpool(label: String?, spool: Spool, ok: Boolean) {
+    if (label != null) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                if (ok) Icons.Default.CheckCircle else Icons.Default.Warning,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp),
+                tint = if (ok) SuccessGreen else WarnAmber,
+            )
+            Spacer(Modifier.width(6.dp))
+            Text(label, style = MaterialTheme.typography.labelMedium)
+        }
+    }
+    Text("#${spool.id}  ${spool.title}", style = MaterialTheme.typography.titleMedium)
+    Text(spool.subtitle(), color = MaterialTheme.colorScheme.onSurfaceVariant)
+    if (spool.tagsSupported) {
+        val n = spool.tags.size
+        Text("$n tag${if (n == 1) "" else "s"} linked in Spoolman", style = MaterialTheme.typography.bodySmall)
     }
 }
 
@@ -601,13 +650,14 @@ private fun SettingsScreen(vm: AppViewModel) {
         HorizontalDivider()
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text("Record tag count in Spoolman", style = MaterialTheme.typography.titleMedium)
+                Text("Link tags in Spoolman", style = MaterialTheme.typography.titleMedium)
                 Text(
-                    "Stores how many tags each spool has (a \"CFS tags written\" extra field) so the count shows in the list.",
+                    "Links each tag you write to its spool in Spoolman, so Spoolman knows which tags belong to which spool. " +
+                        "The tag count in the list comes from Spoolman.",
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
-            Switch(checked = vm.markWritten, onCheckedChange = { vm.updateMarkWritten(it) })
+            Switch(checked = vm.linkTags, onCheckedChange = { vm.updateLinkTags(it) })
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {

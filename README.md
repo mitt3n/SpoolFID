@@ -3,9 +3,9 @@
 Write RFID tags for your Creality CFS straight from your phone, using the spools in your
 [Spoolman](https://github.com/Donkie/Spoolman) inventory.
 
-Pick a spool, hold a blank tag to the back of your phone, and you're done. When the tagged spool goes into
-the CFS, the printer reads the tag, looks the spool up in Spoolman, and fills in the slot's material, color,
-brand, name and remaining weight for you.
+Pick a spool, hold a blank tag to the back of your phone, and you're done. SpoolFID links each tag to its
+spool in Spoolman, and when the tagged spool goes into the CFS, the printer reads the tag, looks the spool up
+in Spoolman, and fills in the slot's material, color, brand, name and remaining weight for you.
 
 SpoolFID is built for the [Jacobean K2 Plus firmware](https://jacob10383.github.io/k2-plus-custom-firmware/cfs/),
 which can link a CFS slot to a Spoolman spool.
@@ -19,7 +19,8 @@ which can link a CFS slot to a Spoolman spool.
   [Amazon listing](https://www.amazon.com/Adhesive-Stickers-Self-Adhesive-Commercial-Proximity/dp/B0G1M659Q7).
   Listings change, so check that anything you buy is MIFARE Classic 1K with a 4-byte UID.
 - **Two tags per spool**, one on each flange (see [Two tags per spool](#two-tags-per-spool)).
-- **A Spoolman server** your phone can reach on your network. Plain `http://` is fine.
+- **A Spoolman server** your phone can reach on your network. Plain `http://` is fine. Use **Spoolman 0.27
+  or newer** so tags can be linked to spools; older versions still work for writing tags.
 - **A Creality printer with a CFS running the Jacobean firmware**, set up as described in
   [Printer setup](#printer-setup).
 
@@ -46,9 +47,13 @@ which can link a CFS slot to a Spoolman spool.
   weight. Anything approximate is shown in amber.
 - **Every write is verified.** SpoolFID reads the tag back before it counts as done. If you tap the same tag
   twice in a row it refuses, so one tag can't be used for two spools.
+- **Tags are linked in Spoolman.** Each tag you write is linked to its spool using Spoolman's own tag feature,
+  so Spoolman knows which physical tags belong to which spool. If you reuse a tag that Spoolman had linked to
+  a different spool, the link moves to the new spool and SpoolFID tells you.
 
-Each spool in the list shows how many tags it has. A green check with "2 tags" means it's finished, and an
-amber "1/2 tags" means it still needs another. Finished spools are hidden by default (the **Hide fully
+Each spool in the list shows how many tags Spoolman has linked to it, so the list always matches Spoolman. A
+green check with "2 tags" means it's finished, and an amber "1/2 tags" means it still needs another. The list
+refreshes whenever you return to the app. Finished spools are hidden by default (the **Hide fully
 tagged** chip), so the list shows what's left to do.
 
 ### Two tags per spool
@@ -68,8 +73,16 @@ asks. You can turn this off in Settings for the fastest batch writing.
 
 ## Reading tags
 
-The **Read** tab decodes any tag you hold to the phone: the spool ID, material, color and weight, along with
-the matching spool from Spoolman. Use it to check a tag before putting the spool in the printer.
+The **Read** tab decodes any tag you hold to the phone: the spool ID, material, color and weight. It also asks
+Spoolman about the tag and tells you where it stands:
+
+- **Linked in Spoolman** (green): Spoolman has this tag linked to the same spool the tag names. All good.
+- **Not linked in Spoolman yet** (amber): the tag names a spool but Spoolman doesn't know the tag. Tap
+  **Link to #N** to link it. This is how you add tags you wrote with an earlier version.
+- **Mismatch** (amber): the tag names one spool but Spoolman has the tag linked to another. Tap **Link to #N
+  instead** to fix Spoolman, or re-write the tag if the tag is the one that's wrong.
+
+Use it to check a tag before putting the spool in the printer.
 
 ## Settings
 
@@ -77,7 +90,7 @@ the matching spool from Spoolman. Use it to check a tag before putting the spool
 |---|---|
 | Spoolman address | Where your Spoolman server is. |
 | Two tags per spool | Write a tag for each flange. On by default. |
-| Record tag count in Spoolman | Stores how many tags each spool has, so the count shows in the list. Creates a "CFS tags written" field in Spoolman the first time. |
+| Link tags in Spoolman | Links every tag you write to its spool in Spoolman, and takes the tag count in the list from there. On by default. |
 | Keep screen on | Stops the display sleeping while you write or read tags. On by default. |
 | Close "Done" screen automatically | After the last tag, returns to the list after Off / 3 / 5 / 10 seconds. The Done button shows the countdown and still works. |
 | Confirm before overwriting | Ask before replacing a tag that already has data. On by default. |
@@ -140,6 +153,12 @@ one in Spoolman, that slot won't show the Spoolman name or remaining weight.
 ### Weights are rounded
 Tags can only hold 250 g, 500 g, 600 g, 750 g or 1000 g. A spool's weight is rounded to the nearest of
 those. If Spoolman has no weight for it, 1000 g is assumed.
+
+### Upgrading from 1.0
+Version 1.0 didn't link tags in Spoolman; it only kept a count in a custom "CFS tags written" field. Tags you
+wrote then work fine in the printer, but Spoolman doesn't know about them yet. Hold each one to the phone on the
+**Read** tab and tap **Link to #N** to add it. Once everything is linked you can delete the old field in
+Spoolman under Settings → Extra Fields.
 
 ### Needs a connection
 SpoolFID needs to reach Spoolman while you use it. There's no offline mode.

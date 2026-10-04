@@ -19,6 +19,7 @@ class MainActivity : ComponentActivity(), NfcAdapter.ReaderCallback {
 
     override fun onResume() {
         super.onResume()
+        vm.onResumed()
         val adapter = NfcAdapter.getDefaultAdapter(this)
         vm.nfcStatus = when {
             adapter == null -> NfcStatus.UNSUPPORTED

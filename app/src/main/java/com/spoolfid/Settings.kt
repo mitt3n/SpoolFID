@@ -10,7 +10,8 @@ class Settings(context: Context) {
         get() = prefs.getString("url", "") ?: ""
         set(v) = prefs.edit { putString("url", v.trim()) }
 
-    var markWritten: Boolean
+    /** Link written tags to their spool in Spoolman. (Stored under the key an earlier version used.) */
+    var linkTags: Boolean
         get() = prefs.getBoolean("markWritten", true)
         set(v) = prefs.edit { putBoolean("markWritten", v) }
 

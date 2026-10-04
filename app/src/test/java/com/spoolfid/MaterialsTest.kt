@@ -18,7 +18,7 @@ class MaterialsTest {
     ) = Spool(
         id = 7, filamentName = "Test", vendor = null, material = material, colorHex = color,
         filamentWeight = weight, initialWeight = null, remainingWeight = null, location = null,
-        tagCount = 0, extra = emptyMap(), multiColor = multiColor,
+        extra = emptyMap(), multiColor = multiColor,
     )
 
     @Test
