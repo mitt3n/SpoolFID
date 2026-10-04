@@ -1,0 +1,42 @@
+# Signing keys and credentials: never commit these
+*.jks
+*.keystore
+*.p12
+*.pem
+keystore.properties
+local.properties
+
+# Build output and packaged apps
+build/
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+.cxx/
+.externalNativeBuild/
+
+# Gradle and Kotlin caches
+.gradle/
+.kotlin/
+
+# IDE and tool state
+.idea/
+*.iml
+.vscode/
+.fleet/
+captures/
+
+# Logs and crash dumps
+*.log
+hs_err_pid*
+*.hprof
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Scratch files (screenshots, notes)
+/screen*.png
+/scratch/
