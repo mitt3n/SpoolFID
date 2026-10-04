@@ -103,7 +103,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var loading by mutableStateOf(false); private set
     var loadError by mutableStateOf<String?>(null); private set
     var query by mutableStateOf("")
-    var hideWritten by mutableStateOf(settings.hideWritten); private set
+    var tagFilter by mutableStateOf(settings.tagFilter); private set
     var selection by mutableStateOf<List<Int>>(emptyList()); private set
 
     var session by mutableStateOf<Session?>(null); private set
@@ -217,17 +217,20 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         settings.confirmOverwrite = v
     }
 
-    fun updateHideWritten(v: Boolean) {
-        hideWritten = v
-        settings.hideWritten = v
+    fun updateTagFilter(f: TagFilter) {
+        tagFilter = f
+        settings.tagFilter = f
     }
+
+    /** How many spools each tag filter would show, for the chip labels. */
+    fun countFor(f: TagFilter): Int = spools.count { f.matches(it.tagCount, requiredTags) }
 
     // ---- Spool list / selection ----
 
     fun visibleSpools(): List<Spool> {
         val q = query.trim().lowercase()
         return spools.filter { s ->
-            (!hideWritten || s.tagCount < requiredTags || s.id in selection) &&
+            (tagFilter.matches(s.tagCount, requiredTags) || s.id in selection) &&
                 (q.isEmpty() || listOfNotNull("#${s.id}", s.title, s.vendor, s.material, s.location)
                     .any { it.lowercase().contains(q) })
         }

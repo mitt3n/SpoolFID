@@ -53,8 +53,23 @@ which can link a CFS slot to a Spoolman spool.
 
 Each spool in the list shows how many tags Spoolman has linked to it, so the list always matches Spoolman. A
 green check with "2 tags" means it's finished, and an amber "1/2 tags" means it still needs another. The list
-refreshes whenever you return to the app. Finished spools are hidden by default (the **Hide fully
-tagged** chip), so the list shows what's left to do.
+refreshes whenever you return to the app.
+
+### Filtering the list
+
+The chips above the list narrow it by how many tags each spool has, and each shows how many spools it would
+list. Your choice is remembered.
+
+| Chip | Shows |
+|---|---|
+| **To do** (default) | Spools that still need tags, so the list shows what's left. |
+| **All** | Every spool. |
+| **Untagged** | Spools with no tags yet. |
+| **Partly tagged** | Spools with some tags but not all (only shown when two tags per spool are on). |
+| **Fully tagged** | Spools that have every tag they need. |
+
+The search box works together with the chips, and any spools you've selected stay visible while you change
+filters.
 
 ### Two tags per spool
 

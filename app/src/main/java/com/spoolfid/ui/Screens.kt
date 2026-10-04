@@ -58,6 +58,7 @@ import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import android.content.Intent
 import android.provider.Settings
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
@@ -87,6 +88,7 @@ import com.spoolfid.NfcStatus
 import com.spoolfid.Phase
 import com.spoolfid.ReadState
 import com.spoolfid.Session
+import com.spoolfid.TagFilter
 import com.spoolfid.Tab
 import com.spoolfid.nfc.TagContents
 import com.spoolfid.spoolman.Spool
@@ -251,15 +253,25 @@ private fun SpoolListScreen(vm: AppViewModel) {
             )
             IconButton(onClick = { vm.refresh() }) { Icon(Icons.Default.Refresh, "Refresh") }
         }
-        Row(Modifier.padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-            FilterChip(
-                selected = vm.hideWritten,
-                onClick = { vm.updateHideWritten(!vm.hideWritten) },
-                label = { Text("Hide fully tagged") },
-            )
-            Spacer(Modifier.width(8.dp))
-            Text("${visible.size} spools", style = MaterialTheme.typography.bodySmall)
+        Row(
+            Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            // "Partly tagged" only means something when a spool needs more than one tag.
+            TagFilter.entries.filter { it != TagFilter.PARTIAL || vm.requiredTags > 1 }.forEach { f ->
+                FilterChip(
+                    selected = vm.tagFilter == f,
+                    onClick = { vm.updateTagFilter(f) },
+                    label = { Text("${f.label} · ${vm.countFor(f)}") },
+                )
+            }
         }
+        Text(
+            "Showing ${visible.size} of ${vm.spools.size} spools",
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+        )
 
         if (vm.loading) LinearProgressIndicator(Modifier.fillMaxWidth())
 

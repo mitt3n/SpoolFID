@@ -34,7 +34,9 @@ class Settings(context: Context) {
         get() = prefs.getBoolean("confirmOverwrite", true)
         set(v) = prefs.edit { putBoolean("confirmOverwrite", v) }
 
-    var hideWritten: Boolean
-        get() = prefs.getBoolean("hideWritten", true)
-        set(v) = prefs.edit { putBoolean("hideWritten", v) }
+    /** Which spools the Write list shows. Falls back to the old "hide fully tagged" switch if it was set. */
+    var tagFilter: TagFilter
+        get() = prefs.getString("tagFilter", null)?.let { name -> TagFilter.entries.firstOrNull { it.name == name } }
+            ?: if (prefs.getBoolean("hideWritten", true)) TagFilter.TO_DO else TagFilter.ALL
+        set(v) = prefs.edit { putString("tagFilter", v.name) }
 }
