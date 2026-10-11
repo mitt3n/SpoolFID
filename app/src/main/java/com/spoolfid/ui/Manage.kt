@@ -61,6 +61,8 @@ internal val Filament.displayColor: String?
 internal fun ManageScreen(vm: AppViewModel) {
     val lib = vm.library
     LaunchedEffect(vm.configured) { if (vm.configured) lib.ensureLoaded() }
+    // Typing in the Filaments search also looks in the public database, like Spoolman's own page does.
+    LaunchedEffect(lib.query, lib.section) { lib.searchDb(if (lib.section == Section.FILAMENTS) lib.query else "") }
 
     if (!vm.configured) {
         Column(
@@ -167,6 +169,9 @@ internal fun ManageScreen(vm: AppViewModel) {
                         VendorItem(v, filamentCount = lib.filaments.count { it.vendor?.id == v.id }) { lib.edit(v) }
                         HorizontalDivider()
                     }
+                }
+                if (lib.section == Section.FILAMENTS) {
+                    databaseMatches(lib) { added -> lib.notice = "Added ${added.title}" }
                 }
                 if (isEmpty(lib, spools, filaments, vendors) && !lib.loading && lib.loadError == null) {
                     item {

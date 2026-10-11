@@ -156,6 +156,12 @@ Other things you can do from a spool's page:
 
 ### Adding from the filament database
 
+When you search for a filament, the Spoolman database's matches appear under your own, as they do in Spoolman's web
+page. That works when choosing a filament for a spool and when searching the Filaments tab. Tap a database match to
+add it, and its manufacturer if that's new; for a spool, it's then used for that spool.
+
+To browse instead of search:
+
 Spoolman keeps a public database of manufacturers and filaments. On the **Filaments** or **Manufacturers** tab,
 **Add manufacturers and filaments from the database** lists every manufacturer in it, marked **New** or **In
 Spoolman**. Open one to see its filaments, tick the ones you want (**Select all new** ticks every one you don't

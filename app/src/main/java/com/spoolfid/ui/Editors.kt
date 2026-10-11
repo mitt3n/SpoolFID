@@ -358,7 +358,29 @@ private fun SpoolEditor(vm: AppViewModel, e: Editor.OfSpool) {
                 }
                 picking = false
             },
-            onDismiss = { picking = false },
+            onDismiss = {
+                picking = false
+                lib.searchDb("")
+            },
+            onQuery = { lib.searchDb(it) },
+            more = {
+                databaseMatches(lib) { added ->
+                    // Same as picking one you already had: the new filament is used for this spool.
+                    val start = SpoolForm.newOf(added)
+                    form = if (e.id == null) {
+                        form.copy(
+                            filamentId = added.id,
+                            initialWeight = form.initialWeight.ifBlank { start.initialWeight },
+                            spoolWeight = form.spoolWeight.ifBlank { start.spoolWeight },
+                            price = form.price.ifBlank { start.price },
+                        )
+                    } else {
+                        form.copy(filamentId = added.id)
+                    }
+                    picking = false
+                    lib.searchDb("")
+                }
+            },
         )
     }
 }
@@ -602,6 +624,8 @@ private fun <T> PickerDialog(
     onPick: (T) -> Unit,
     onDismiss: () -> Unit,
     footer: @Composable () -> Unit = {},
+    onQuery: (String) -> Unit = {},
+    more: androidx.compose.foundation.lazy.LazyListScope.() -> Unit = {},
 ) {
     var query by remember { mutableStateOf("") }
     val shown = items.filter { query.isBlank() || text(it).contains(query.trim(), ignoreCase = true) }
@@ -612,7 +636,10 @@ private fun <T> PickerDialog(
             Column {
                 OutlinedTextField(
                     value = query,
-                    onValueChange = { query = it },
+                    onValueChange = {
+                        query = it
+                        onQuery(it)
+                    },
                     label = { Text("Search") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
@@ -621,10 +648,42 @@ private fun <T> PickerDialog(
                     items(shown) { item ->
                         Column(Modifier.clickable { onPick(item) }) { row(item) }
                     }
+                    more()
                 }
             }
         },
         confirmButton = footer,
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
+}
+
+/** The "from the Spoolman database" section under a filament search: tap one to add it and use it. */
+internal fun androidx.compose.foundation.lazy.LazyListScope.databaseMatches(lib: Library, onAdded: (Filament) -> Unit) {
+    if (lib.dbHits.isEmpty() && !lib.dbSearching && lib.dbError == null) return
+    item(key = "db-header") {
+        Column {
+            HorizontalDivider()
+            Text(
+                "From the Spoolman database",
+                style = MaterialTheme.typography.labelLarge,
+                modifier = Modifier.padding(top = 8.dp),
+            )
+            Text(
+                "Not in your Spoolman yet. Tapping one adds it, and its manufacturer if that's new.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (lib.dbSearching) CircularProgressIndicator(Modifier.padding(vertical = 8.dp).size(20.dp), strokeWidth = 2.dp)
+            lib.dbError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+        }
+    }
+    items(lib.dbHits, key = { "db-${it.id}" }) { c ->
+        Column(Modifier.clickable(enabled = !lib.saving) { lib.addFromCatalog(c, onAdded) }) {
+            PickerRow(
+                c.colorHex ?: c.colorHexes.firstOrNull(),
+                "${c.manufacturer} \u00b7 ${c.name}",
+                "${c.material} \u00b7 ${formatNumber(c.weight)} g",
+            )
+        }
+    }
 }

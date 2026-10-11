@@ -15,6 +15,8 @@ import com.spoolfid.spoolman.Vendor
 import com.spoolfid.spoolman.VendorForm
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -89,6 +91,12 @@ class Library(
 
     /** The whole community filament database, loaded once the first time it's opened. */
     var catalog by mutableStateOf<List<CatalogFilament>?>(null); private set
+
+    /** Database filaments matching what's being typed in a filament search, that aren't in Spoolman yet. */
+    var dbHits by mutableStateOf<List<CatalogFilament>>(emptyList()); private set
+    var dbSearching by mutableStateOf(false); private set
+    var dbError by mutableStateOf<String?>(null)
+    private var dbSearch: Job? = null
 
     /** What the last import did, shown on the database screen. */
     var importMessage by mutableStateOf<String?>(null); private set
@@ -166,6 +174,60 @@ class Library(
         catalogResults = emptyList()
         catalogError = null
         editor = e
+    }
+
+    /**
+     * Looks up [text] in the public filament database as it's typed, so a filament that isn't in Spoolman yet can be
+     * picked from the same list as the ones that are. Short or empty text clears the matches.
+     */
+    fun searchDb(text: String) {
+        dbSearch?.cancel()
+        dbError = null
+        if (text.trim().length < 2) {
+            dbHits = emptyList()
+            dbSearching = false
+            return
+        }
+        dbSearch = scope.launch {
+            delay(300)
+            dbSearching = true
+            runCatching { withContext(Dispatchers.IO) { client().searchCatalog(text, limit = 20) } }
+                .onSuccess { found -> dbHits = found.filter { !CatalogBrowse.registered(it, filaments) } }
+                // A server without the database just has no matches to offer; that isn't worth an error.
+                .onFailure { dbHits = emptyList() }
+            dbSearching = false
+        }
+    }
+
+    /**
+     * Adds a database filament to Spoolman, creating its manufacturer if you don't have it, and hands back the new
+     * filament so it can be used straight away (picked for a spool, or opened to review).
+     */
+    fun addFromCatalog(entry: CatalogFilament, onDone: (Filament) -> Unit) {
+        if (saving) return
+        saving = true
+        dbError = null
+        scope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val c = client()
+                    val vendor = CatalogBrowse.vendorNamed(entry.manufacturer, vendors)
+                        ?: c.createVendor(VendorForm(name = entry.manufacturer))
+                    vendor to c.createFilament(FilamentForm.of(entry, vendor.id))
+                }
+            }.onSuccess { (vendor, filament) ->
+                feedback(true)
+                if (vendors.none { it.id == vendor.id }) vendors = (vendors + vendor).sortedBy { it.name.lowercase() }
+                filaments = filaments + filament
+                dbHits = dbHits.filter { it.id != entry.id }
+                onDone(filament)
+                refresh()
+            }.onFailure {
+                feedback(false)
+                dbError = describe(it)
+            }
+            saving = false
+        }
     }
 
     /** Opens the database browser, on the list of manufacturers or straight into one. */

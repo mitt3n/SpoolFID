@@ -879,13 +879,13 @@ private fun SettingsScreen(vm: AppViewModel) {
         var dontShow by remember { mutableStateOf(false) }
         AlertDialog(
             onDismissRequest = { vm.dismissReportNotice(dontShow) },
-            title = { Text("Enable it on the server too") },
+            title = { Text("Make Spoolman jump to scans") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(
-                        "Reporting scans only works if the feature is also enabled on your Spoolman server. " +
-                            "If Spoolman doesn't react to scans, check the server's settings. The status line under the " +
-                            "switch shows what Spoolman made of the last scan.",
+                        "1. Enable tag scanning on your Spoolman server.\n" +
+                            "2. In Spoolman's web page, open the scanner and choose SpoolFID as the reader.\n" +
+                            "3. Turn on auto-navigate, and leave the page on the dashboard with the scanner closed.",
                     )
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Checkbox(checked = dontShow, onCheckedChange = { dontShow = it })
