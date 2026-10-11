@@ -243,6 +243,7 @@ private fun SpoolEditor(vm: AppViewModel, e: Editor.OfSpool) {
     val lib = vm.library
     var form by remember(e) { mutableStateOf(e.form) }
     var picking by remember { mutableStateOf(false) }
+    val context = androidx.compose.ui.platform.LocalContext.current
     var copies by remember(e) { mutableStateOf("1") }
     var scale by remember(e) { mutableStateOf("") }
     val filament = form.filamentId?.let { lib.filament(it) }
@@ -328,6 +329,7 @@ private fun SpoolEditor(vm: AppViewModel, e: Editor.OfSpool) {
                 Button(onClick = { vm.startSession(listOf(existing)) }, Modifier.fillMaxWidth()) { Text("Write tags for this spool") }
             }
             HorizontalDivider()
+            OutlinedButton(onClick = { vm.printLabels(context, listOf(existing)) }, Modifier.fillMaxWidth()) { Text("Print a QR label for this spool") }
             OutlinedButton(onClick = { lib.duplicate(existing) }, Modifier.fillMaxWidth()) { Text("Duplicate this spool") }
             DeleteButton(
                 "Delete spool",

@@ -6,6 +6,8 @@ import androidx.compose.runtime.setValue
 import com.spoolfid.spoolman.CatalogFilament
 import com.spoolfid.spoolman.Filament
 import com.spoolfid.spoolman.FilamentForm
+import com.spoolfid.spoolman.QrCodes
+import com.spoolfid.spoolman.ScannedCode
 import com.spoolfid.spoolman.Spool
 import com.spoolfid.spoolman.SpoolForm
 import com.spoolfid.spoolman.SpoolmanClient
@@ -453,6 +455,44 @@ class Library(
                     weighMessage = describe(it)
                 }
             saving = false
+        }
+    }
+
+    // ---- Opening what a scanned QR code points at ----
+
+    /** A QR code was scanned: open the spool or filament it names, if it's one of Spoolman's labels. */
+    fun openFromCode(text: String) {
+        val code = QrCodes.parse(text)
+        if (code == null) {
+            feedback(false)
+            notice = "That QR code isn't from Spoolman"
+            return
+        }
+        scope.launch {
+            when (code) {
+                is ScannedCode.OfSpool -> {
+                    val found = spool(code.id)
+                        ?: runCatching { withContext(Dispatchers.IO) { client().getSpool(code.id) } }.getOrNull()
+                    if (found != null) {
+                        feedback(true)
+                        edit(found)
+                    } else {
+                        feedback(false)
+                        notice = "Spool #${code.id} isn't in Spoolman"
+                    }
+                }
+                is ScannedCode.OfFilament -> {
+                    val found = filament(code.id)
+                        ?: runCatching { withContext(Dispatchers.IO) { client().getFilament(code.id) } }.getOrNull()
+                    if (found != null) {
+                        feedback(true)
+                        edit(found)
+                    } else {
+                        feedback(false)
+                        notice = "Filament #${code.id} isn't in Spoolman"
+                    }
+                }
+            }
         }
     }
 

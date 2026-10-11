@@ -18,6 +18,7 @@ which can link a CFS slot to a Spoolman spool.
 - **Blank MIFARE Classic 1K tags with a 4-byte UID.** These adhesive MIFARE stickers are known to work:
   [Amazon listing](https://www.amazon.com/Adhesive-Stickers-Self-Adhesive-Commercial-Proximity/dp/B0G1M659Q7).
   Listings change, so check that anything you buy is MIFARE Classic 1K with a 4-byte UID.
+- **QR labels**: print them for your spools and scan them with the camera.
 - **Several tags per spool**, two by default, one on each flange (see [Tags per spool](#tags-per-spool)).
 - **A Spoolman server** your phone can reach on your network. Plain `http://` is fine. Use **Spoolman 0.27
   or newer** so tags can be linked to spools; older versions still work for writing tags.
@@ -40,8 +41,9 @@ more than one view has tabs along the top:
 | Section | Tabs |
 |---|---|
 | **Write** | The spool list, with its filters. |
-| **Read** | **Read a tag** decodes a tag and checks it against Spoolman. **Find a spool** opens whatever a tag is linked to. |
+| **Read** | **Read a tag** decodes a tag and checks it against Spoolman. **Find a spool** opens whatever a tag is linked to. **Scan a label** reads a QR code with the camera. |
 | **Manage** | **Spools**, **Filaments** and **Manufacturers**. |
+| **Labels** | **Spools** (pick which to print) and **Layout** (paper, size and what's on the label). |
 | **Tag audit** | Spools whose tags need work. |
 | **Settings** | **Spoolman**, **Writing** and **Reading**. |
 
@@ -182,6 +184,34 @@ Open a spool or filament and its **Tags** section lists every tag Spoolman has l
   has that tag on something else, it's moved here and you're told where it came from.
 - The bin next to a tag **unlinks** it in Spoolman. The tag keeps what's written on it.
 - On a spool, **Write tags for this spool** starts the usual write flow for it.
+
+## QR labels
+
+Besides RFID tags, SpoolFID can print and scan QR labels for your spools. They use the same codes as Spoolman's own
+labels, so a label printed here works in Spoolman's scanner, and one printed from Spoolman's page works here.
+
+### Printing labels
+
+Open **Labels**, tick the spools on the **Spools** tab and tap **Print**. Android's print dialog opens: pick a
+printer, or **Save as PDF**. A single spool's page also has **Print a QR label for this spool**.
+
+The **Layout** tab sets:
+
+| Setting | What it does |
+|---|---|
+| Layout | **Sheet** puts several labels on an A4 page with a line to cut along. **Label printer** makes each page the size of one label. |
+| Label size | A preset (30×20 up to 100×50 mm) or any width and height from 15 to 150 mm. For a sheet it shows how many fit. |
+| QR code holds a web link | Off: Spoolman's spool code. On: a link to the spool's page in Spoolman, which any phone camera can open. Spoolman's scanner and SpoolFID read both. |
+| Show the manufacturer, Show the material | What goes under the spool's name. |
+
+Each label has the QR code, the spool's number, name, a dot in the filament's color and the details you chose.
+Printing needs a printer or print service set up on your phone, or just save the PDF.
+
+### Scanning labels
+
+**Read → Scan a label** opens the camera. Hold a QR label from Spoolman or SpoolFID in view and the spool opens,
+ready to edit, weigh in or write tags for. The first time, Android asks to allow the camera. Nothing is recorded or
+sent anywhere; the camera is only used for this screen, and everything else works without it.
 
 ## Jumping to a spool in the browser
 

@@ -2,6 +2,8 @@ package com.spoolfid
 
 import android.content.Context
 import androidx.core.content.edit
+import com.spoolfid.labels.LabelLayout
+import com.spoolfid.labels.LabelSettings
 
 class Settings(context: Context) {
     private val prefs = context.getSharedPreferences("spoolfid", Context.MODE_PRIVATE)
@@ -56,6 +58,25 @@ class Settings(context: Context) {
     var hideReportNotice: Boolean
         get() = prefs.getBoolean("hideReportNotice", false)
         set(v) = prefs.edit { putBoolean("hideReportNotice", v) }
+
+    /** How spool labels are laid out and what they show. */
+    var labels: LabelSettings
+        get() = LabelSettings(
+            layout = LabelLayout.entries.firstOrNull { it.name == prefs.getString("labelLayout", null) } ?: LabelLayout.SHEET,
+            widthMm = prefs.getInt("labelWidth", 50).coerceIn(LabelSettings.MIN_MM, LabelSettings.MAX_MM),
+            heightMm = prefs.getInt("labelHeight", 30).coerceIn(LabelSettings.MIN_MM, LabelSettings.MAX_MM),
+            qrAsLink = prefs.getBoolean("labelLink", false),
+            showVendor = prefs.getBoolean("labelVendor", true),
+            showMaterial = prefs.getBoolean("labelMaterial", true),
+        )
+        set(v) = prefs.edit {
+            putString("labelLayout", v.layout.name)
+            putInt("labelWidth", v.widthMm)
+            putInt("labelHeight", v.heightMm)
+            putBoolean("labelLink", v.qrAsLink)
+            putBoolean("labelVendor", v.showVendor)
+            putBoolean("labelMaterial", v.showMaterial)
+        }
 
     var confirmOverwrite: Boolean
         get() = prefs.getBoolean("confirmOverwrite", true)

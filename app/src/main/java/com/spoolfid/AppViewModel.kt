@@ -1,6 +1,7 @@
 package com.spoolfid
 
 import android.app.Application
+import android.content.Context
 import android.media.AudioManager
 import android.media.ToneGenerator
 import android.nfc.Tag
@@ -11,6 +12,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.spoolfid.labels.LabelPrinter
+import com.spoolfid.labels.LabelSettings
 import com.spoolfid.nfc.DecodedPayload
 import com.spoolfid.nfc.ExistingDataException
 import com.spoolfid.nfc.TagContents
@@ -34,12 +37,16 @@ enum class Tab(val label: String) {
     WRITE("Write"),
     READ("Read"),
     MANAGE("Manage"),
+    LABELS("Labels"),
     AUDIT("Tag audit"),
     SETTINGS("Settings"),
 }
 
 /** The tabs inside Read. */
-enum class ReadPage(val label: String) { READ("Read a tag"), FIND("Find a spool") }
+enum class ReadPage(val label: String) { READ("Read a tag"), FIND("Find a spool"), QR("Scan a label") }
+
+/** The tabs inside Labels. */
+enum class LabelsPage(val label: String) { SPOOLS("Spools"), LAYOUT("Layout") }
 
 /** The tabs inside Settings. */
 enum class SettingsPage(val label: String) { SPOOLMAN("Spoolman"), WRITING("Writing"), READING("Reading") }
@@ -114,6 +121,34 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var tab by mutableStateOf(Tab.WRITE); private set
     var readPage by mutableStateOf(ReadPage.READ); private set
     var settingsPage by mutableStateOf(SettingsPage.SPOOLMAN); private set
+    var labelsPage by mutableStateOf(LabelsPage.SPOOLS); private set
+
+    fun goLabels(p: LabelsPage) {
+        labelsPage = p
+    }
+
+    // ---- Labels ----
+
+    var labelSettings by mutableStateOf(settings.labels); private set
+    var labelSelection by mutableStateOf<Set<Int>>(emptySet()); private set
+
+    fun updateLabels(change: (LabelSettings) -> LabelSettings) {
+        settings.labels = change(labelSettings)
+        labelSettings = settings.labels
+    }
+
+    fun toggleLabel(id: Int) {
+        labelSelection = if (id in labelSelection) labelSelection - id else labelSelection + id
+    }
+
+    fun selectLabels(ids: Collection<Int>) {
+        labelSelection = ids.toSet()
+    }
+
+    /** Opens Android's print dialog with a label for each of [list], to print or save as a PDF. */
+    fun printLabels(context: Context, list: List<Spool>) {
+        LabelPrinter.print(context, list.sortedBy { it.id }, labelSettings, SpoolmanClient.normalize(settings.spoolmanUrl))
+    }
 
     /** Where the user has been, so the back gesture returns to the previous screen instead of leaving the app. */
     private data class Place(val tab: Tab, val read: ReadPage, val settings: SettingsPage, val section: Section)

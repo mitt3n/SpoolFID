@@ -4,10 +4,13 @@
     <uses-permission android:name="android.permission.NFC" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- Only for scanning QR codes on spool labels; everything else works without it. -->
+    <uses-permission android:name="android.permission.CAMERA" />
 
     <uses-feature android:name="android.hardware.nfc" android:required="true" />
     <!-- MIFARE Classic only works on NXP NFC controllers. -->
     <uses-feature android:name="com.nxp.mifare" android:required="true" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
 
     <application
         android:allowBackup="true"

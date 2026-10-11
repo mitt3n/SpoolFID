@@ -5,6 +5,10 @@ before tagging; the release fails if it's missing.
 
 ## Unreleased
 
+- Print QR labels for your spools from the new **Labels** section, on a sheet or to a label printer, in a size you
+  choose. They use Spoolman's own spool codes, so they work in Spoolman's scanner too.
+- Scan QR labels with the camera (Read → Scan a label) to open a spool. This asks for the camera permission, only
+  when you use it.
 - Tags per spool is now a number, 1 to 6 (it was a two-or-one switch), still 2 by default. The seconds before the Done
   screen closes is also a number, 0 to 60, and now defaults to 3.
 - The back gesture now returns to the previous screen, or clears a selection, instead of sending the app to the

@@ -33,6 +33,7 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.DrawerValue
@@ -136,6 +137,7 @@ private fun Tab.icon(): ImageVector = when (this) {
     Tab.WRITE -> Icons.Default.Edit
     Tab.READ -> Icons.Default.Search
     Tab.MANAGE -> Icons.Default.Build
+    Tab.LABELS -> Icons.Default.Share
     Tab.AUDIT -> Icons.Default.CheckCircle
     Tab.SETTINGS -> Icons.Default.Settings
 }
@@ -210,6 +212,7 @@ fun App(vm: AppViewModel) {
                     Tab.WRITE -> SpoolListScreen(vm)
                     Tab.READ -> ReadGroup(vm)
                     Tab.MANAGE -> ManageScreen(vm)
+                    Tab.LABELS -> LabelsScreen(vm)
                     Tab.AUDIT -> AuditScreen(vm)
                     Tab.SETTINGS -> SettingsScreen(vm)
                 }
@@ -675,6 +678,7 @@ private fun ReadGroup(vm: AppViewModel) {
         when (vm.readPage) {
             ReadPage.READ -> ReadScreen(vm)
             ReadPage.FIND -> FindScreen(vm)
+            ReadPage.QR -> QrScreen(vm)
         }
     }
 }
@@ -832,7 +836,7 @@ private fun SpoolmanSpool(label: String?, spool: Spool, ok: Boolean) {
 // ---------------------------------------------------------------- settings tab
 
 @Composable
-private fun SwitchRow(title: String, text: String, checked: Boolean, onChange: (Boolean) -> Unit, note: String? = null) {
+internal fun SwitchRow(title: String, text: String, checked: Boolean, onChange: (Boolean) -> Unit, note: String? = null) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.titleMedium)
@@ -844,7 +848,7 @@ private fun SwitchRow(title: String, text: String, checked: Boolean, onChange: (
 }
 
 @Composable
-private fun StepperRow(
+internal fun StepperRow(
     title: String,
     text: String,
     value: Int,
