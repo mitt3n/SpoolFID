@@ -76,6 +76,7 @@ internal fun EditorScreen(vm: AppViewModel) {
         is Editor.OfSpool -> SpoolEditor(vm, e)
         is Editor.OfFilament -> FilamentEditor(vm, e)
         is Editor.OfVendor -> VendorEditor(vm.library, e)
+        is Editor.OfCatalog -> CatalogScreen(vm, e)
         null -> Unit
     }
 }

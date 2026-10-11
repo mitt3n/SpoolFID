@@ -5,6 +5,14 @@ before tagging; the release fails if it's missing.
 
 ## Unreleased
 
+- Tags per spool is now a number, 1 to 6 (it was a two-or-one switch), still 2 by default. The seconds before the Done
+  screen closes is also a number, 0 to 60, and now defaults to 3.
+- The back gesture now returns to the previous screen, or clears a selection, instead of sending the app to the
+  background. It only leaves the app from the first screen.
+- Add manufacturers and filaments from Spoolman's public filament database: browse by manufacturer, tick several
+  filaments and add them in one go, creating the manufacturer if it's new.
+- Settings now explains when Spoolman's web page jumps to a scanned spool, and shows what Spoolman made of the last
+  scan.
 - New side panel (menu button, top left) replaces the bottom bar. Sections with several views have tabs: Read
   (Read a tag, Find a spool), Manage (Spools, Filaments, Manufacturers) and Settings (Spoolman, Writing, Reading).
   Tag audit is its own section.

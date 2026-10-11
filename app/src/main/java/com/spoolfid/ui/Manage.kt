@@ -33,6 +33,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Tab
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -69,7 +70,7 @@ internal fun ManageScreen(vm: AppViewModel) {
         ) {
             Text("Connect to Spoolman to manage your spools", style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(16.dp))
-            Button(onClick = { vm.tab = Tab.SETTINGS }) { Text("Set Spoolman address") }
+            Button(onClick = { vm.goTo(Tab.SETTINGS) }) { Text("Set Spoolman address") }
         }
         return
     }
@@ -94,7 +95,7 @@ internal fun ManageScreen(vm: AppViewModel) {
                     "${s.label} · $count"
                 },
                 lib.section.ordinal,
-            ) { lib.section = Section.entries[it] }
+            ) { vm.goSection(Section.entries[it]) }
             Row(
                 Modifier.fillMaxWidth().padding(start = 12.dp, end = 4.dp, top = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -113,6 +114,12 @@ internal fun ManageScreen(vm: AppViewModel) {
                     singleLine = true,
                 )
                 IconButton(onClick = { lib.refresh() }) { Icon(Icons.Default.Refresh, "Refresh") }
+            }
+            if (lib.section != Section.SPOOLS) {
+                OutlinedButton(
+                    onClick = { lib.openCatalog() },
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+                ) { Text("Add manufacturers and filaments from the database") }
             }
             if (lib.section == Section.SPOOLS) {
                 Row(Modifier.padding(horizontal = 12.dp)) {
@@ -325,7 +332,7 @@ internal fun AuditScreen(vm: AppViewModel) {
         ) {
             Text("Connect to Spoolman to audit your tags", style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(16.dp))
-            Button(onClick = { vm.tab = com.spoolfid.Tab.SETTINGS }) { Text("Set Spoolman address") }
+            Button(onClick = { vm.goTo(com.spoolfid.Tab.SETTINGS) }) { Text("Set Spoolman address") }
         }
         return
     }

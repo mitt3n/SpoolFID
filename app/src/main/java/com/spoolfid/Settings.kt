@@ -15,10 +15,17 @@ class Settings(context: Context) {
         get() = prefs.getBoolean("markWritten", true)
         set(v) = prefs.edit { putBoolean("markWritten", v) }
 
-    /** One tag per flange; the CFS only reads the tag on the side facing its reader. */
-    var twoTagsPerSpool: Boolean
-        get() = prefs.getBoolean("twoTagsPerSpool", true)
-        set(v) = prefs.edit { putBoolean("twoTagsPerSpool", v) }
+    /**
+     * Tags written per spool, one for each flange the CFS might read. Starts at 2, and carries over the old
+     * two-or-one switch if that was set.
+     */
+    var tagsPerSpool: Int
+        get() = when {
+            prefs.contains("tagsPerSpool") -> prefs.getInt("tagsPerSpool", DEFAULT_TAGS)
+            prefs.contains("twoTagsPerSpool") -> if (prefs.getBoolean("twoTagsPerSpool", true)) 2 else 1
+            else -> DEFAULT_TAGS
+        }.coerceIn(MIN_TAGS, MAX_TAGS)
+        set(v) = prefs.edit { putInt("tagsPerSpool", v.coerceIn(MIN_TAGS, MAX_TAGS)) }
 
     /** Keep the display on during write sessions and on the Read tab, so batch writing doesn't stall. */
     var keepScreenOn: Boolean
@@ -27,8 +34,8 @@ class Settings(context: Context) {
 
     /** Seconds before the "Done" screen closes itself after a write session; 0 = stay until dismissed. */
     var doneCloseSeconds: Int
-        get() = prefs.getInt("doneCloseSeconds", 5)
-        set(v) = prefs.edit { putInt("doneCloseSeconds", v) }
+        get() = prefs.getInt("doneCloseSeconds", DEFAULT_DONE_SECONDS).coerceIn(0, MAX_DONE_SECONDS)
+        set(v) = prefs.edit { putInt("doneCloseSeconds", v.coerceIn(0, MAX_DONE_SECONDS)) }
 
     /** On the Read tab, link a tag that names a spool as soon as it's scanned, without asking. */
     var autoLink: Boolean
@@ -55,3 +62,9 @@ class Settings(context: Context) {
             ?: if (prefs.getBoolean("hideWritten", true)) TagFilter.TO_DO else TagFilter.ALL
         set(v) = prefs.edit { putString("tagFilter", v.name) }
 }
+
+const val MIN_TAGS = 1
+const val MAX_TAGS = 6
+const val DEFAULT_TAGS = 2
+const val MAX_DONE_SECONDS = 60
+const val DEFAULT_DONE_SECONDS = 3

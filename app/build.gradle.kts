@@ -29,6 +29,7 @@ android {
         // The release workflow derives both from the git tag (v1.2.3 -> "1.2.3" / 10203).
         versionCode = (findProperty("versionCodeOverride") as String?)?.toIntOrNull() ?: 10200
         versionName = (findProperty("versionNameOverride") as String?)?.takeIf { it.isNotBlank() } ?: "1.2.0"
+        manifestPlaceholders["appLabel"] = "SpoolFID"
     }
 
     signingConfigs {
@@ -43,6 +44,12 @@ android {
     }
 
     buildTypes {
+        debug {
+            // A separate app, so a test build installs next to the signed release instead of replacing it.
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug"
+            manifestPlaceholders["appLabel"] = "SpoolFID debug"
+        }
         release {
             // R8 stays off: there is no crash reporting, so a release-only breakage would go unnoticed.
             isMinifyEnabled = false

@@ -29,6 +29,9 @@ sealed interface Editor {
     data class OfSpool(val id: Int?, val form: SpoolForm) : Editor
     data class OfFilament(val id: Int?, val form: FilamentForm) : Editor
     data class OfVendor(val id: Int?, val form: VendorForm) : Editor
+
+    /** Browsing the public filament database; [manufacturer] is null on the list of manufacturers. */
+    data class OfCatalog(val manufacturer: String?) : Editor
 }
 
 private class Loaded(
@@ -83,6 +86,12 @@ class Library(
     var catalogResults by mutableStateOf<List<CatalogFilament>>(emptyList()); private set
     var catalogLoading by mutableStateOf(false); private set
     var catalogError by mutableStateOf<String?>(null); private set
+
+    /** The whole community filament database, loaded once the first time it's opened. */
+    var catalog by mutableStateOf<List<CatalogFilament>?>(null); private set
+
+    /** What the last import did, shown on the database screen. */
+    var importMessage by mutableStateOf<String?>(null); private set
 
     private var loaded = false
 
@@ -157,6 +166,80 @@ class Library(
         catalogResults = emptyList()
         catalogError = null
         editor = e
+    }
+
+    /** Opens the database browser, on the list of manufacturers or straight into one. */
+    fun openCatalog(manufacturer: String? = null) {
+        open(Editor.OfCatalog(manufacturer))
+        importMessage = null
+        if (catalog == null) loadCatalog()
+    }
+
+    fun loadCatalog() {
+        catalogLoading = true
+        catalogError = null
+        scope.launch {
+            runCatching { withContext(Dispatchers.IO) { client().fullCatalog() } }
+                .onSuccess { catalog = it }
+                .onFailure { catalogError = describe(it) }
+            catalogLoading = false
+        }
+    }
+
+    fun showManufacturer(name: String?) {
+        importMessage = null
+        editor = Editor.OfCatalog(name)
+    }
+
+    /** One step back: from a manufacturer's filaments to the manufacturers, otherwise out of the form. */
+    fun back() {
+        val e = editor
+        if (e is Editor.OfCatalog && e.manufacturer != null) showManufacturer(null) else closeEditor()
+    }
+
+    /**
+     * Adds [entries] from the database to Spoolman under [manufacturer]. The manufacturer is created first if you don't
+     * have one by that name; with no entries, only the manufacturer is added. Stops at the first filament Spoolman
+     * refuses and says how far it got.
+     */
+    fun importFromCatalog(manufacturer: String, entries: List<CatalogFilament>) {
+        if (saving) return
+        saving = true
+        importMessage = null
+        scope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val c = client()
+                    var created = false
+                    val vendor = CatalogBrowse.vendorNamed(manufacturer, vendors)
+                        ?: c.createVendor(VendorForm(name = manufacturer)).also { created = true }
+                    var added = 0
+                    var problem: String? = null
+                    for (entry in entries) {
+                        try {
+                            c.createFilament(FilamentForm.of(entry, vendor.id))
+                            added++
+                        } catch (e: SpoolmanException) {
+                            problem = "${entry.name}: ${e.message}"
+                            break
+                        }
+                    }
+                    Triple(created, added, problem)
+                }
+            }.onSuccess { (created, added, problem) ->
+                feedback(problem == null)
+                importMessage = listOfNotNull(
+                    if (created) "Added $manufacturer" else null,
+                    if (added > 0) "added $added filament${if (added == 1) "" else "s"}" else null,
+                    problem?.let { "stopped at $it" },
+                ).joinToString(", ").replaceFirstChar { it.uppercase() }.ifEmpty { "Nothing to add" }
+                refresh()
+            }.onFailure {
+                feedback(false)
+                importMessage = describe(it)
+            }
+            saving = false
+        }
     }
 
     fun closeEditor() {

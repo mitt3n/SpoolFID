@@ -111,9 +111,55 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private var cachedClientUrl: String? = null
 
     var nfcStatus by mutableStateOf(NfcStatus.OK)
-    var tab by mutableStateOf(Tab.WRITE)
-    var readPage by mutableStateOf(ReadPage.READ)
-    var settingsPage by mutableStateOf(SettingsPage.SPOOLMAN)
+    var tab by mutableStateOf(Tab.WRITE); private set
+    var readPage by mutableStateOf(ReadPage.READ); private set
+    var settingsPage by mutableStateOf(SettingsPage.SPOOLMAN); private set
+
+    /** Where the user has been, so the back gesture returns to the previous screen instead of leaving the app. */
+    private data class Place(val tab: Tab, val read: ReadPage, val settings: SettingsPage, val section: Section)
+
+    private val history = NavHistory<Place>()
+    private var historySize by mutableStateOf(0)
+
+    private fun here() = Place(tab, readPage, settingsPage, library.section)
+
+    private fun leave(change: () -> Unit) {
+        history.push(here())
+        historySize = history.size
+        change()
+    }
+
+    fun goTo(t: Tab) {
+        if (t != tab) leave { tab = t }
+    }
+
+    fun goRead(p: ReadPage) {
+        if (p != readPage) leave { readPage = p }
+    }
+
+    fun goSettings(p: SettingsPage) {
+        if (p != settingsPage) leave { settingsPage = p }
+    }
+
+    fun goSection(s: Section) {
+        if (s != library.section) leave { library.section = s }
+    }
+
+    /** There is something for back to do inside the app: clear a selection, or return to the previous screen. */
+    val canGoBack: Boolean get() = selection.isNotEmpty() || historySize > 0
+
+    fun back() {
+        if (selection.isNotEmpty()) {
+            clearSelection()
+            return
+        }
+        val place = history.pop() ?: return
+        historySize = history.size
+        tab = place.tab
+        readPage = place.read
+        settingsPage = place.settings
+        library.section = place.section
+    }
 
     var spools by mutableStateOf<List<Spool>>(emptyList()); private set
     var loading by mutableStateOf(false); private set
@@ -133,7 +179,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** What Spoolman answered to the last scan report, or why it didn't take it. Shown under the setting. */
     var reportStatus by mutableStateOf<String?>(null); private set
     var extra by mutableStateOf(ExtraFilters()); private set
-    var twoTagsPerSpool by mutableStateOf(settings.twoTagsPerSpool); private set
+    var tagsPerSpool by mutableStateOf(settings.tagsPerSpool); private set
     var keepScreenOn by mutableStateOf(settings.keepScreenOn); private set
     var doneCloseSeconds by mutableStateOf(settings.doneCloseSeconds); private set
     var settingsStatus by mutableStateOf<String?>(null); private set
@@ -152,7 +198,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     )
 
     /** Tags a spool needs to count as fully tagged. */
-    val requiredTags: Int get() = if (twoTagsPerSpool) 2 else 1
+    val requiredTags: Int get() = tagsPerSpool
 
     init {
         if (configured) refresh()
@@ -235,13 +281,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun updateDoneCloseSeconds(v: Int) {
-        doneCloseSeconds = v
         settings.doneCloseSeconds = v
+        doneCloseSeconds = settings.doneCloseSeconds
     }
 
-    fun updateTwoTagsPerSpool(v: Boolean) {
-        twoTagsPerSpool = v
-        settings.twoTagsPerSpool = v
+    fun updateTagsPerSpool(v: Int) {
+        settings.tagsPerSpool = v
+        tagsPerSpool = settings.tagsPerSpool
     }
 
     fun updateAutoLink(v: Boolean) {
@@ -331,7 +377,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun startSession(list: List<Spool>) {
         if (list.isEmpty()) return
-        session = Session(queue = list, copies = if (settings.twoTagsPerSpool) 2 else 1)
+        session = Session(queue = list, copies = settings.tagsPerSpool)
         selection = emptyList()
     }
 

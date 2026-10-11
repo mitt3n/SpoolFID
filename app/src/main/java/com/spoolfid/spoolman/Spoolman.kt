@@ -241,6 +241,9 @@ class SpoolmanClient(rawUrl: String, private val transport: HttpTransport = UrlC
 
     fun locations(): List<String> = stringList(request("GET", "/api/v1/location"))
 
+    /** Every filament in the community database, for browsing by manufacturer. A few MB, so fetched once. */
+    fun fullCatalog(): List<CatalogFilament> = parseList(request("GET", "/api/v1/external/filament")) { parseCatalog(it) }
+
     /** Searches the community filament database Spoolman serves, so a filament can start from a known one. */
     fun searchCatalog(query: String, limit: Int = 30): List<CatalogFilament> =
         parseList(request("GET", "/api/v1/external/filament/search?query=${URLEncoder.encode(query.trim(), "UTF-8")}&limit=$limit")) {

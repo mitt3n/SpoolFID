@@ -18,7 +18,7 @@ which can link a CFS slot to a Spoolman spool.
 - **Blank MIFARE Classic 1K tags with a 4-byte UID.** These adhesive MIFARE stickers are known to work:
   [Amazon listing](https://www.amazon.com/Adhesive-Stickers-Self-Adhesive-Commercial-Proximity/dp/B0G1M659Q7).
   Listings change, so check that anything you buy is MIFARE Classic 1K with a 4-byte UID.
-- **Two tags per spool**, one on each flange (see [Two tags per spool](#two-tags-per-spool)).
+- **Several tags per spool**, two by default, one on each flange (see [Tags per spool](#tags-per-spool)).
 - **A Spoolman server** your phone can reach on your network. Plain `http://` is fine. Use **Spoolman 0.27
   or newer** so tags can be linked to spools; older versions still work for writing tags.
 - **A Creality printer with a CFS running the Jacobean firmware**, set up as described in
@@ -33,7 +33,8 @@ which can link a CFS slot to a Spoolman spool.
 
 ## Finding your way around
 
-Tap the menu button (three lines, top left) to open the side panel. Each entry opens a section, and a section with
+Tap the menu button (three lines, top left) to open the side panel. The back gesture returns to the screen you
+came from, and only leaves the app from the first screen. Each entry opens a section, and a section with
 more than one view has tabs along the top:
 
 | Section | Tabs |
@@ -78,7 +79,7 @@ list. Your choice is remembered.
 | **To do** (default) | Spools that still need tags, so the list shows what's left. |
 | **All** | Every spool. |
 | **Untagged** | Spools with no tags yet. |
-| **Partly tagged** | Spools with some tags but not all (only shown when two tags per spool are on). |
+| **Partly tagged** | Spools with some tags but not all (only shown when a spool needs more than one tag). |
 | **Fully tagged** | Spools that have every tag they need. |
 | **Not linked** | Spools tagged with an earlier version whose tags aren't linked in Spoolman yet. Only shown while there are some. |
 
@@ -97,14 +98,15 @@ Under the tag chips, a second row narrows the list further. Each chip only appea
 
 They combine with each other and with the tag chips.
 
-### Two tags per spool
+### Tags per spool
 
 Put a tag on **each flange** of the spool and write both for the same spool. Genuine Creality spools carry
 two identical tags, and the CFS only reads the tag on the side facing its reader. A spool with a single tag
 may be read one way round and ignored the other. With a tag on both sides it works however you insert it.
 
 SpoolFID does this for you. For each spool it asks for two tags in a row ("tag 1 of 2", then "now a tag for
-the other side"), writing the same data to both. You can switch to one tag per spool in Settings.
+the other side"), writing the same data to both. Settings → Writing → **Tags per spool** changes how many each
+spool gets, from 1 to 6. Two is the default.
 
 ### Overwrite protection
 
@@ -152,6 +154,14 @@ Other things you can do from a spool's page:
 - **Several spools at once:** when adding a spool, **How many spools** creates that many identical ones.
   **Duplicate this spool** starts a new one from an existing spool, full and without tags.
 
+### Adding from the filament database
+
+Spoolman keeps a public database of manufacturers and filaments. On the **Filaments** or **Manufacturers** tab,
+**Add manufacturers and filaments from the database** lists every manufacturer in it, marked **New** or **In
+Spoolman**. Open one to see its filaments, tick the ones you want (**Select all new** ticks every one you don't
+have yet) and tap **Add**. If you don't have the manufacturer yet, it's created first. **Add manufacturer** adds just
+the manufacturer. Filaments you've already added from the database show as **Added**.
+
 ### Finding and auditing tags
 
 - **Find a spool** (Read → Find a spool): hold any tag to the phone to open the spool or filament it is linked to.
@@ -167,6 +177,20 @@ Open a spool or filament and its **Tags** section lists every tag Spoolman has l
 - The bin next to a tag **unlinks** it in Spoolman. The tag keeps what's written on it.
 - On a spool, **Write tags for this spool** starts the usual write flow for it.
 
+## Jumping to a spool in the browser
+
+With **Report scans to Spoolman** on, each tag you scan on the Read tab is reported to Spoolman as if from a tag
+reader, which shows in the Spoolman web page in your browser. The page only jumps to the spool when all of these
+hold:
+
+1. In the page's scanner, **SpoolFID** is chosen as the reader and **auto-navigate** is on.
+2. The page is showing its **dashboard** (the home page). On any other page it only shows a message.
+3. The scanner and add dialogs are closed, and no text box has focus.
+4. The tag is linked to a spool or filament in Spoolman. If it isn't, you get a message saying so.
+
+Under the switch in Settings, SpoolFID shows what Spoolman made of the last scan, such as "spool #12", which tells
+you whether the tag was matched.
+
 ## Settings
 
 Settings has three tabs: **Spoolman** (the address and tag linking), **Writing** and **Reading**.
@@ -174,12 +198,12 @@ Settings has three tabs: **Spoolman** (the address and tag linking), **Writing**
 | Setting | What it does |
 |---|---|
 | Spoolman address | Where your Spoolman server is. |
-| Two tags per spool | Write a tag for each flange. On by default. |
+| Tags per spool | How many tags to write for each spool, 1 to 6. Two by default, one for each flange. |
 | Link tags in Spoolman | Links every tag you write to its spool in Spoolman, and takes the tag count in the list from there. On by default. |
 | Link tags when reading | On the Read tab, links a tag to the spool it names as soon as you scan it, if Spoolman doesn't have it yet. Never moves a tag from another spool. Off by default. |
-| Report scans to Spoolman | Tells Spoolman about each tag you scan on the Read tab, the way a tag reader would. In Spoolman's web page, pick **SpoolFID** as the tag reader and the page jumps to whatever you scan. Needs a recent Spoolman. Off by default. |
+| Report scans to Spoolman | Tells Spoolman about each tag you scan on the Read tab, the way a tag reader would. Needs a recent Spoolman. Off by default. See [Jumping to a spool in the browser](#jumping-to-a-spool-in-the-browser). |
 | Keep screen on | Stops the display sleeping while you write or read tags. On by default. |
-| Close "Done" screen automatically | After the last tag, returns to the list after Off / 3 / 5 / 10 seconds. The Done button shows the countdown and still works. |
+| Close "Done" screen after | After the last tag, returns to the list after this many seconds, 0 to 60. 3 by default; 0 leaves it open. The Done button shows the countdown and still works. |
 | Confirm before overwriting | Ask before replacing a tag that already has data. On by default. |
 
 ## Printer setup

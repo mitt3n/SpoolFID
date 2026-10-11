@@ -9,6 +9,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -101,6 +102,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.isSystemInDarkTheme
 import com.spoolfid.AppViewModel
+import com.spoolfid.MAX_DONE_SECONDS
+import com.spoolfid.MAX_TAGS
+import com.spoolfid.MIN_TAGS
 import com.spoolfid.NfcStatus
 import com.spoolfid.Phase
 import com.spoolfid.ReadState
@@ -154,10 +158,13 @@ fun App(vm: AppViewModel) {
         return
     }
     if (vm.library.editor != null) {
-        BackHandler { vm.library.closeEditor() }
+        BackHandler { vm.library.back() }
         Surface(Modifier.fillMaxSize()) { EditorScreen(vm) }
         return
     }
+
+    // Back returns to the previous screen (and clears a selection) instead of sending the app to the background.
+    BackHandler(enabled = vm.canGoBack) { vm.back() }
 
     val drawer = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
@@ -176,7 +183,7 @@ fun App(vm: AppViewModel) {
                         icon = { Icon(t.icon(), contentDescription = null) },
                         selected = vm.tab == t,
                         onClick = {
-                            vm.tab = t
+                            vm.goTo(t)
                             scope.launch { drawer.close() }
                         },
                         modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding),
@@ -282,7 +289,7 @@ private fun SpoolListScreen(vm: AppViewModel) {
             ) {
                 Text("Connect to Spoolman to get started", style = MaterialTheme.typography.titleMedium)
                 Spacer(Modifier.height(16.dp))
-                Button(onClick = { vm.tab = Tab.SETTINGS }) { Text("Set Spoolman address") }
+                Button(onClick = { vm.goTo(Tab.SETTINGS) }) { Text("Set Spoolman address") }
             }
             return@Column
         }
@@ -615,7 +622,11 @@ private fun StatusPanel(s: Session, onOverwrite: () -> Unit, onDecline: () -> Un
         when (s.phase) {
             Phase.WAITING -> {
                 Text(
-                    if (s.copy == 0) "Hold a tag to the back of the phone" else "Now a tag for the other side of the spool",
+                    when {
+                        s.copy == 0 -> "Hold a tag to the back of the phone"
+                        s.copies == 2 -> "Now a tag for the other side of the spool"
+                        else -> "Now tag ${s.copy + 1} of ${s.copies}"
+                    },
                     style = MaterialTheme.typography.titleLarge,
                     textAlign = TextAlign.Center,
                 )
@@ -659,7 +670,7 @@ private fun StatusPanel(s: Session, onOverwrite: () -> Unit, onDecline: () -> Un
 @Composable
 private fun ReadGroup(vm: AppViewModel) {
     Column(Modifier.fillMaxSize()) {
-        GroupTabs(ReadPage.entries.map { it.label }, vm.readPage.ordinal) { vm.readPage = ReadPage.entries[it] }
+        GroupTabs(ReadPage.entries.map { it.label }, vm.readPage.ordinal) { vm.goRead(ReadPage.entries[it]) }
         when (vm.readPage) {
             ReadPage.READ -> ReadScreen(vm)
             ReadPage.FIND -> FindScreen(vm)
@@ -682,7 +693,7 @@ private fun FindScreen(vm: AppViewModel) {
             if (!vm.configured) {
                 Text("Connect to Spoolman first", style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
                 Spacer(Modifier.height(16.dp))
-                Button(onClick = { vm.tab = Tab.SETTINGS }) { Text("Set Spoolman address") }
+                Button(onClick = { vm.goTo(Tab.SETTINGS) }) { Text("Set Spoolman address") }
                 return@Column
             }
             Text(
@@ -832,9 +843,39 @@ private fun SwitchRow(title: String, text: String, checked: Boolean, onChange: (
 }
 
 @Composable
+private fun StepperRow(
+    title: String,
+    text: String,
+    value: Int,
+    range: IntRange,
+    format: (Int) -> String = { it.toString() },
+    onChange: (Int) -> Unit,
+) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.titleMedium)
+            Text(text, style = MaterialTheme.typography.bodySmall)
+        }
+        OutlinedButton(
+            onClick = { onChange(value - 1) },
+            enabled = value > range.first,
+            contentPadding = PaddingValues(0.dp),
+            modifier = Modifier.size(40.dp),
+        ) { Text("\u2212") }
+        Text(format(value), Modifier.width(52.dp), textAlign = TextAlign.Center, style = MaterialTheme.typography.titleMedium)
+        OutlinedButton(
+            onClick = { onChange(value + 1) },
+            enabled = value < range.last,
+            contentPadding = PaddingValues(0.dp),
+            modifier = Modifier.size(40.dp),
+        ) { Text("+") }
+    }
+}
+
+@Composable
 private fun SettingsScreen(vm: AppViewModel) {
     Column(Modifier.fillMaxSize()) {
-        GroupTabs(SettingsPage.entries.map { it.label }, vm.settingsPage.ordinal) { vm.settingsPage = SettingsPage.entries[it] }
+        GroupTabs(SettingsPage.entries.map { it.label }, vm.settingsPage.ordinal) { vm.goSettings(SettingsPage.entries[it]) }
         Column(
             Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -865,11 +906,13 @@ private fun SettingsScreen(vm: AppViewModel) {
                     )
                 }
                 SettingsPage.WRITING -> {
-                    SwitchRow(
-                        "Two tags per spool",
-                        "Write a tag for each flange. The CFS only reads the tag on the side facing its reader.",
-                        vm.twoTagsPerSpool,
-                        { vm.updateTwoTagsPerSpool(it) },
+                    StepperRow(
+                        "Tags per spool",
+                        "A tag for each place the printer might read. The CFS only reads the tag on the side facing its " +
+                            "reader, so two (one per flange) is usual.",
+                        vm.tagsPerSpool,
+                        MIN_TAGS..MAX_TAGS,
+                        onChange = { vm.updateTagsPerSpool(it) },
                     )
                     SwitchRow(
                         "Confirm before overwriting",
@@ -883,23 +926,14 @@ private fun SettingsScreen(vm: AppViewModel) {
                         vm.keepScreenOn,
                         { vm.updateKeepScreenOn(it) },
                     )
-                    Column {
-                        Text("Close \"Done\" screen automatically", style = MaterialTheme.typography.titleMedium)
-                        Text(
-                            "Returns to the spool list this long after the last tag is written.",
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            listOf(0 to "Off", 3 to "3 s", 5 to "5 s", 10 to "10 s").forEach { (secs, label) ->
-                                FilterChip(
-                                    selected = vm.doneCloseSeconds == secs,
-                                    onClick = { vm.updateDoneCloseSeconds(secs) },
-                                    label = { Text(label) },
-                                )
-                            }
-                        }
-                    }
+                    StepperRow(
+                        "Close \"Done\" screen after",
+                        "Returns to the spool list this many seconds after the last tag is written. 0 leaves it open.",
+                        vm.doneCloseSeconds,
+                        0..MAX_DONE_SECONDS,
+                        format = { if (it == 0) "Off" else "$it s" },
+                        onChange = { vm.updateDoneCloseSeconds(it) },
+                    )
                 }
                 SettingsPage.READING -> {
                     SwitchRow(
@@ -911,8 +945,9 @@ private fun SettingsScreen(vm: AppViewModel) {
                     )
                     SwitchRow(
                         "Report scans to Spoolman",
-                        "Tells Spoolman about each tag you scan on the Read tab, as a tag reader would. A Spoolman " +
-                            "browser window paired with this phone (pick \"SpoolFID\" as the reader there) jumps to the spool.",
+                        "Tells Spoolman about each tag you scan on the Read tab, as a tag reader would. In Spoolman's web page, open " +
+                            "the scanner, pick \"SpoolFID\" as the reader and turn on auto-navigate. The page only jumps while it's " +
+                            "on the dashboard with the scanner closed; elsewhere it just shows a message.",
                         vm.reportScans,
                         { vm.updateReportScans(it) },
                         note = vm.reportStatus,

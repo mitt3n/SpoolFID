@@ -176,6 +176,19 @@ class ManageClientTest {
     }
 
     @Test
+    fun theWholeDatabaseCanBeFetchedForBrowsing() {
+        fake.respond(
+            "GET /api/v1/external/filament",
+            200 to """[{"id":"a1","manufacturer":"Prusament","name":"Black","material":"ASA","density":1.07,"weight":800.0,"diameter":1.75},""" +
+                """{"id":"b1","manufacturer":"esun","name":"Rainbow","material":"PLA","density":1.24,"weight":1000.0,"diameter":1.75,"color_hexes":["FF0000","00FF00"]}]""",
+        )
+        val all = client.fullCatalog()
+        assertEquals(listOf("a1", "b1"), all.map { it.id })
+        assertEquals(listOf("FF0000", "00FF00"), all[1].colorHexes)
+        assertNull(all[0].colorHex)
+    }
+
+    @Test
     fun theFilamentDatabaseIsSearched() {
         fake.respond(
             "GET /api/v1/external/filament/search",
