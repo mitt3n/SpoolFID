@@ -22,7 +22,6 @@ enum class Section(val label: String) {
     SPOOLS("Spools"),
     FILAMENTS("Filaments"),
     MANUFACTURERS("Manufacturers"),
-    AUDIT("Tag audit"),
 }
 
 /** The form that is open, with what it starts out holding. `id` is null while creating. */
@@ -314,7 +313,7 @@ class Library(
 
     // ---- Finding by tag ----
 
-    /** A tag was held to the phone on the Manage tab: open whatever it is linked to. */
+    /** A tag was held to the phone on the Find tab: open whatever it is linked to. */
     fun findByTag(uid: String) {
         reportScan(uid, null)
         scope.launch {

@@ -31,6 +31,19 @@ which can link a CFS slot to a Spoolman spool.
 2. Open the downloaded file. Android will ask you to allow installs from your browser or file manager the
    first time. Allow it, then install.
 
+## Finding your way around
+
+Tap the menu button (three lines, top left) to open the side panel. Each entry opens a section, and a section with
+more than one view has tabs along the top:
+
+| Section | Tabs |
+|---|---|
+| **Write** | The spool list, with its filters. |
+| **Read** | **Read a tag** decodes a tag and checks it against Spoolman. **Find a spool** opens whatever a tag is linked to. |
+| **Manage** | **Spools**, **Filaments** and **Manufacturers**. |
+| **Tag audit** | Spools whose tags need work. |
+| **Settings** | **Spoolman**, **Writing** and **Reading**. |
+
 ## Getting started
 
 1. Open **Settings** and enter your Spoolman address, for example `192.168.1.50:7912`. Tap **Save & test**.
@@ -117,7 +130,7 @@ Use it to check a tag before putting the spool in the printer.
 The **Manage** tab edits your Spoolman inventory directly, so you don't need the web page to add a spool or fix a
 detail. Everything is saved to Spoolman as you go; SpoolFID keeps no copy of its own.
 
-Pick **Spools**, **Filaments** or **Manufacturers** at the top, search the list, and tap an entry to edit it. The
+Pick the **Spools**, **Filaments** or **Manufacturers** tab, search the list, and tap an entry to edit it. The
 **Add** button creates a new one.
 
 - **Manufacturers** have a name, an empty spool weight and a comment. Deleting one removes it from Spoolman.
@@ -132,16 +145,18 @@ Pick **Spools**, **Filaments** or **Manufacturers** at the top, search the list,
 
 If Spoolman refuses a change, such as deleting a filament that still has spools, the app shows its reason.
 
-Other things the Manage tab does:
+Other things you can do from a spool's page:
 
 - **Weigh in:** on a spool, enter the scale reading of the whole spool and tap **Update**. Spoolman subtracts the
   empty spool's weight to get the remaining filament.
 - **Several spools at once:** when adding a spool, **How many spools** creates that many identical ones.
   **Duplicate this spool** starts a new one from an existing spool, full and without tags.
-- **Find by tag:** with the Manage list showing, hold any tag to the phone to open the spool or filament it is
-  linked to.
-- **Tag audit:** lists the spools whose tags need work: too few tags, tags from version 1.0 that aren't linked,
-  tags still on an archived spool, and tags on spool #1.
+
+### Finding and auditing tags
+
+- **Find a spool** (Read → Find a spool): hold any tag to the phone to open the spool or filament it is linked to.
+- **Tag audit** (its own section): lists the spools whose tags need work: too few tags, tags from version 1.0 that
+  aren't linked, tags still on an archived spool, and tags on spool #1.
 
 ### Tags
 
@@ -154,13 +169,15 @@ Open a spool or filament and its **Tags** section lists every tag Spoolman has l
 
 ## Settings
 
+Settings has three tabs: **Spoolman** (the address and tag linking), **Writing** and **Reading**.
+
 | Setting | What it does |
 |---|---|
 | Spoolman address | Where your Spoolman server is. |
 | Two tags per spool | Write a tag for each flange. On by default. |
 | Link tags in Spoolman | Links every tag you write to its spool in Spoolman, and takes the tag count in the list from there. On by default. |
 | Link tags when reading | On the Read tab, links a tag to the spool it names as soon as you scan it, if Spoolman doesn't have it yet. Never moves a tag from another spool. Off by default. |
-| Report scans to Spoolman | Tells Spoolman about each tag you scan on the Read and Manage tabs, the way a tag reader would. In Spoolman's web page, pick **SpoolFID** as the tag reader and the page jumps to whatever you scan. Needs a recent Spoolman. Off by default. |
+| Report scans to Spoolman | Tells Spoolman about each tag you scan on the Read tab, the way a tag reader would. In Spoolman's web page, pick **SpoolFID** as the tag reader and the page jumps to whatever you scan. Needs a recent Spoolman. Off by default. |
 | Keep screen on | Stops the display sleeping while you write or read tags. On by default. |
 | Close "Done" screen automatically | After the last tag, returns to the list after Off / 3 / 5 / 10 seconds. The Done button shows the countdown and still works. |
 | Confirm before overwriting | Ask before replacing a tag that already has data. On by default. |

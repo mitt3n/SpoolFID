@@ -5,6 +5,9 @@ before tagging; the release fails if it's missing.
 
 ## Unreleased
 
+- New side panel (menu button, top left) replaces the bottom bar. Sections with several views have tabs: Read
+  (Read a tag, Find a spool), Manage (Spools, Filaments, Manufacturers) and Settings (Spoolman, Writing, Reading).
+  Tag audit is its own section.
 - New **Manage** tab: add, edit and delete manufacturers, filaments and spools in Spoolman without leaving the app,
   and archive or restore spools.
 - New filaments can start from the community filament database that Spoolman serves.
@@ -12,7 +15,7 @@ before tagging; the release fails if it's missing.
 - Write list: new **Needs attention**, **Low**, **Material** and **Location** filters that combine with the tag chips.
 - Weigh in a spool from its page: enter the scale reading and Spoolman works out what's left.
 - Create several identical spools at once, or duplicate a spool.
-- Hold a tag to the phone on the Manage tab to open whatever it's linked to.
+- Hold a tag to the phone on Read → Find a spool to open whatever it's linked to.
 - **Tag audit** list of spools with missing, unlinked or stray tags.
 - New setting **Report scans to Spoolman** makes the phone act as a Spoolman tag reader, so a paired browser window follows what you scan.
 - New setting **Link tags when reading** links a scanned tag to its spool automatically.

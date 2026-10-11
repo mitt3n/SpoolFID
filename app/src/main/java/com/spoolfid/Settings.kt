@@ -35,7 +35,7 @@ class Settings(context: Context) {
         get() = prefs.getBoolean("autoLink", false)
         set(v) = prefs.edit { putBoolean("autoLink", v) }
 
-    /** Tell Spoolman about tags scanned on the Read and Manage tabs, so a paired browser window follows along. */
+    /** Tell Spoolman about tags scanned on the Read tab, so a paired browser window follows along. */
     var reportScans: Boolean
         get() = prefs.getBoolean("reportScans", false)
         set(v) = prefs.edit { putBoolean("reportScans", v) }

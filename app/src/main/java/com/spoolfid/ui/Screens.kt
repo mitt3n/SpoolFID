@@ -33,6 +33,18 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.ModalDrawerSheet
+import androidx.compose.material3.ModalNavigationDrawer
+import androidx.compose.material3.NavigationDrawerItem
+import androidx.compose.material3.NavigationDrawerItemDefaults
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberDrawerState
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
+import com.spoolfid.ReadPage
+import com.spoolfid.SettingsPage
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -119,9 +131,11 @@ private fun Tab.icon(): ImageVector = when (this) {
     Tab.WRITE -> Icons.Default.Edit
     Tab.READ -> Icons.Default.Search
     Tab.MANAGE -> Icons.Default.Build
+    Tab.AUDIT -> Icons.Default.CheckCircle
     Tab.SETTINGS -> Icons.Default.Settings
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun App(vm: AppViewModel) {
     val session = vm.session
@@ -144,26 +158,53 @@ fun App(vm: AppViewModel) {
         Surface(Modifier.fillMaxSize()) { EditorScreen(vm) }
         return
     }
-    Scaffold(
-        bottomBar = {
-            NavigationBar {
+
+    val drawer = rememberDrawerState(DrawerValue.Closed)
+    val scope = rememberCoroutineScope()
+    ModalNavigationDrawer(
+        drawerState = drawer,
+        drawerContent = {
+            ModalDrawerSheet {
+                Text(
+                    "SpoolFID",
+                    style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier.padding(horizontal = 28.dp, vertical = 24.dp),
+                )
                 Tab.entries.forEach { t ->
-                    NavigationBarItem(
-                        selected = vm.tab == t,
-                        onClick = { vm.tab = t },
-                        icon = { Icon(t.icon(), contentDescription = null) },
+                    NavigationDrawerItem(
                         label = { Text(t.label) },
+                        icon = { Icon(t.icon(), contentDescription = null) },
+                        selected = vm.tab == t,
+                        onClick = {
+                            vm.tab = t
+                            scope.launch { drawer.close() }
+                        },
+                        modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding),
                     )
                 }
             }
         },
-    ) { pad ->
-        Box(Modifier.padding(pad).fillMaxSize()) {
-            when (vm.tab) {
-                Tab.WRITE -> SpoolListScreen(vm)
-                Tab.READ -> ReadScreen(vm)
-                Tab.MANAGE -> ManageScreen(vm)
-                Tab.SETTINGS -> SettingsScreen(vm)
+    ) {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text(vm.tab.label) },
+                    navigationIcon = {
+                        IconButton(onClick = { scope.launch { drawer.open() } }) {
+                            Icon(Icons.Default.Menu, contentDescription = "Open menu")
+                        }
+                    },
+                )
+            },
+        ) { pad ->
+            Box(Modifier.padding(pad).fillMaxSize()) {
+                when (vm.tab) {
+                    Tab.WRITE -> SpoolListScreen(vm)
+                    Tab.READ -> ReadGroup(vm)
+                    Tab.MANAGE -> ManageScreen(vm)
+                    Tab.AUDIT -> AuditScreen(vm)
+                    Tab.SETTINGS -> SettingsScreen(vm)
+                }
             }
         }
     }
@@ -616,6 +657,57 @@ private fun StatusPanel(s: Session, onOverwrite: () -> Unit, onDecline: () -> Un
 // ---------------------------------------------------------------- read tab
 
 @Composable
+private fun ReadGroup(vm: AppViewModel) {
+    Column(Modifier.fillMaxSize()) {
+        GroupTabs(ReadPage.entries.map { it.label }, vm.readPage.ordinal) { vm.readPage = ReadPage.entries[it] }
+        when (vm.readPage) {
+            ReadPage.READ -> ReadScreen(vm)
+            ReadPage.FIND -> FindScreen(vm)
+        }
+    }
+}
+
+/** Hold any tag to the phone and open the spool or filament Spoolman has it linked to. */
+@Composable
+private fun FindScreen(vm: AppViewModel) {
+    val lib = vm.library
+    LaunchedEffect(vm.configured) { if (vm.configured) lib.ensureLoaded() }
+    Column(Modifier.fillMaxSize()) {
+        NfcBanner(vm.nfcStatus)
+        Column(
+            Modifier.fillMaxSize().padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            if (!vm.configured) {
+                Text("Connect to Spoolman first", style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
+                Spacer(Modifier.height(16.dp))
+                Button(onClick = { vm.tab = Tab.SETTINGS }) { Text("Set Spoolman address") }
+                return@Column
+            }
+            Text(
+                "Hold a tag to the back of the phone to open its spool or filament",
+                style = MaterialTheme.typography.titleMedium,
+                textAlign = TextAlign.Center,
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "Works with any tag that is linked to a spool or filament in Spoolman.",
+                style = MaterialTheme.typography.bodySmall,
+                textAlign = TextAlign.Center,
+            )
+            lib.notice?.let { note ->
+                Spacer(Modifier.height(16.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(note, color = WarnAmber, modifier = Modifier.weight(1f, fill = false))
+                    IconButton(onClick = { lib.notice = null }) { Icon(Icons.Default.Close, "Dismiss") }
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun ReadScreen(vm: AppViewModel) {
     Column(Modifier.fillMaxSize()) {
         NfcBanner(vm.nfcStatus)
@@ -728,108 +820,105 @@ private fun SpoolmanSpool(label: String?, spool: Spool, ok: Boolean) {
 // ---------------------------------------------------------------- settings tab
 
 @Composable
+private fun SwitchRow(title: String, text: String, checked: Boolean, onChange: (Boolean) -> Unit, note: String? = null) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.titleMedium)
+            Text(text, style = MaterialTheme.typography.bodySmall)
+            note?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary) }
+        }
+        Switch(checked = checked, onCheckedChange = onChange)
+    }
+}
+
+@Composable
 private fun SettingsScreen(vm: AppViewModel) {
-    Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        Text("Settings", style = MaterialTheme.typography.headlineSmall)
-        OutlinedTextField(
-            value = vm.url,
-            onValueChange = { vm.url = it },
-            label = { Text("Spoolman address") },
-            placeholder = { Text("192.168.1.50:7912") },
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Button(onClick = { vm.saveSettings() }) { Text("Save & test") }
-            Spacer(Modifier.width(12.dp))
-            vm.settingsStatus?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
-        }
-        HorizontalDivider()
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text("Link tags in Spoolman", style = MaterialTheme.typography.titleMedium)
-                Text(
-                    "Links each tag you write to its spool in Spoolman, so Spoolman knows which tags belong to which spool. " +
-                        "The tag count in the list comes from Spoolman.",
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
-            Switch(checked = vm.linkTags, onCheckedChange = { vm.updateLinkTags(it) })
-        }
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text("Link tags when reading", style = MaterialTheme.typography.titleMedium)
-                Text(
-                    "On the Read tab, link a tag to the spool it names as soon as you scan it, if Spoolman doesn't have it yet. " +
-                        "A tag Spoolman has on a different spool is never moved without asking.",
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
-            Switch(checked = vm.autoLink, onCheckedChange = { vm.updateAutoLink(it) })
-        }
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text("Report scans to Spoolman", style = MaterialTheme.typography.titleMedium)
-                Text(
-                    "Tells Spoolman about each tag you scan on the Read and Manage tabs, as a tag reader would. A Spoolman " +
-                        "browser window paired with this phone (pick \"SpoolFID\" as the reader there) jumps to the spool.",
-                    style = MaterialTheme.typography.bodySmall,
-                )
-                vm.reportStatus?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary) }
-            }
-            Switch(checked = vm.reportScans, onCheckedChange = { vm.updateReportScans(it) })
-        }
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text("Two tags per spool", style = MaterialTheme.typography.titleMedium)
-                Text(
-                    "Write a tag for each flange. The CFS only reads the tag on the side facing its reader.",
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
-            Switch(checked = vm.twoTagsPerSpool, onCheckedChange = { vm.updateTwoTagsPerSpool(it) })
-        }
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text("Keep screen on", style = MaterialTheme.typography.titleMedium)
-                Text(
-                    "Stops the display sleeping during write sessions and on the Read tab.",
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
-            Switch(checked = vm.keepScreenOn, onCheckedChange = { vm.updateKeepScreenOn(it) })
-        }
-        Column {
-            Text("Close \"Done\" screen automatically", style = MaterialTheme.typography.titleMedium)
-            Text(
-                "Returns to the spool list this long after the last tag is written.",
-                style = MaterialTheme.typography.bodySmall,
-            )
-            Spacer(Modifier.height(8.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf(0 to "Off", 3 to "3 s", 5 to "5 s", 10 to "10 s").forEach { (secs, label) ->
-                    FilterChip(
-                        selected = vm.doneCloseSeconds == secs,
-                        onClick = { vm.updateDoneCloseSeconds(secs) },
-                        label = { Text(label) },
+    Column(Modifier.fillMaxSize()) {
+        GroupTabs(SettingsPage.entries.map { it.label }, vm.settingsPage.ordinal) { vm.settingsPage = SettingsPage.entries[it] }
+        Column(
+            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            when (vm.settingsPage) {
+                SettingsPage.SPOOLMAN -> {
+                    OutlinedTextField(
+                        value = vm.url,
+                        onValueChange = { vm.url = it },
+                        label = { Text("Spoolman address") },
+                        placeholder = { Text("192.168.1.50:7912") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Button(onClick = { vm.saveSettings() }) { Text("Save & test") }
+                        Spacer(Modifier.width(12.dp))
+                        vm.settingsStatus?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
+                    }
+                    HorizontalDivider()
+                    SwitchRow(
+                        "Link tags in Spoolman",
+                        "Links each tag you write to its spool in Spoolman, so Spoolman knows which tags belong to which spool. " +
+                            "The tag count in the list comes from Spoolman.",
+                        vm.linkTags,
+                        { vm.updateLinkTags(it) },
+                    )
+                }
+                SettingsPage.WRITING -> {
+                    SwitchRow(
+                        "Two tags per spool",
+                        "Write a tag for each flange. The CFS only reads the tag on the side facing its reader.",
+                        vm.twoTagsPerSpool,
+                        { vm.updateTwoTagsPerSpool(it) },
+                    )
+                    SwitchRow(
+                        "Confirm before overwriting",
+                        "Ask first when a tag already holds a different spool or other CFS data. Turn off for fastest batch writing.",
+                        vm.confirmOverwrite,
+                        { vm.updateConfirmOverwrite(it) },
+                    )
+                    SwitchRow(
+                        "Keep screen on",
+                        "Stops the display sleeping during write sessions and on the Read tab.",
+                        vm.keepScreenOn,
+                        { vm.updateKeepScreenOn(it) },
+                    )
+                    Column {
+                        Text("Close \"Done\" screen automatically", style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            "Returns to the spool list this long after the last tag is written.",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            listOf(0 to "Off", 3 to "3 s", 5 to "5 s", 10 to "10 s").forEach { (secs, label) ->
+                                FilterChip(
+                                    selected = vm.doneCloseSeconds == secs,
+                                    onClick = { vm.updateDoneCloseSeconds(secs) },
+                                    label = { Text(label) },
+                                )
+                            }
+                        }
+                    }
+                }
+                SettingsPage.READING -> {
+                    SwitchRow(
+                        "Link tags when reading",
+                        "On the Read tab, link a tag to the spool it names as soon as you scan it, if Spoolman doesn't have it yet. " +
+                            "A tag Spoolman has on a different spool is never moved without asking.",
+                        vm.autoLink,
+                        { vm.updateAutoLink(it) },
+                    )
+                    SwitchRow(
+                        "Report scans to Spoolman",
+                        "Tells Spoolman about each tag you scan on the Read tab, as a tag reader would. A Spoolman " +
+                            "browser window paired with this phone (pick \"SpoolFID\" as the reader there) jumps to the spool.",
+                        vm.reportScans,
+                        { vm.updateReportScans(it) },
+                        note = vm.reportStatus,
                     )
                 }
             }
-        }
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text("Confirm before overwriting", style = MaterialTheme.typography.titleMedium)
-                Text(
-                    "Ask first when a tag already holds a different spool or other CFS data. " +
-                        "Turn off for fastest batch writing.",
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
-            Switch(checked = vm.confirmOverwrite, onCheckedChange = { vm.updateConfirmOverwrite(it) })
         }
     }
 }

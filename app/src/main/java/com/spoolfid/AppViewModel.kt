@@ -29,7 +29,20 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-enum class Tab(val label: String) { WRITE("Write"), READ("Read"), MANAGE("Manage"), SETTINGS("Settings") }
+/** The destinations in the side panel. */
+enum class Tab(val label: String) {
+    WRITE("Write"),
+    READ("Read"),
+    MANAGE("Manage"),
+    AUDIT("Tag audit"),
+    SETTINGS("Settings"),
+}
+
+/** The tabs inside Read. */
+enum class ReadPage(val label: String) { READ("Read a tag"), FIND("Find a spool") }
+
+/** The tabs inside Settings. */
+enum class SettingsPage(val label: String) { SPOOLMAN("Spoolman"), WRITING("Writing"), READING("Reading") }
 
 enum class NfcStatus { OK, DISABLED, UNSUPPORTED, NO_MIFARE }
 
@@ -99,6 +112,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     var nfcStatus by mutableStateOf(NfcStatus.OK)
     var tab by mutableStateOf(Tab.WRITE)
+    var readPage by mutableStateOf(ReadPage.READ)
+    var settingsPage by mutableStateOf(SettingsPage.SPOOLMAN)
 
     var spools by mutableStateOf<List<Spool>>(emptyList()); private set
     var loading by mutableStateOf(false); private set
@@ -370,7 +385,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         when {
             s != null -> if (s.phase == Phase.WAITING || s.phase == Phase.ERROR || s.phase == Phase.CONFIRM) writeTag(tag, s)
             library.scanTarget != null -> library.onTag(tag.id.toHex())
-            tab == Tab.MANAGE && library.editor == null -> library.findByTag(tag.id.toHex())
+            tab == Tab.READ && readPage == ReadPage.FIND && library.editor == null -> library.findByTag(tag.id.toHex())
             tab == Tab.READ -> readTag(tag)
         }
     }
