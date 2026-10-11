@@ -56,6 +56,8 @@ class Library(
     /** Reloads those, so the Write list follows what changed here. */
     private val refreshActive: () -> Unit,
     private val feedback: (Boolean) -> Unit,
+    /** Tells Spoolman a tag was scanned (when that's switched on). */
+    private val reportScan: (uid: String, format: String?) -> Unit = { _, _ -> },
 ) {
     var section by mutableStateOf(Section.SPOOLS)
     var query by mutableStateOf("")
@@ -314,6 +316,7 @@ class Library(
 
     /** A tag was held to the phone on the Manage tab: open whatever it is linked to. */
     fun findByTag(uid: String) {
+        reportScan(uid, null)
         scope.launch {
             spools().firstOrNull { it.hasTag(uid) }?.let { found ->
                 feedback(true)
@@ -367,6 +370,7 @@ class Library(
                     TagMove.None -> ""
                 }
                 reload(target)
+                reportScan(uid, null)
             }.onFailure {
                 feedback(false)
                 scanMessage = "Couldn't link the tag: ${describe(it)}"

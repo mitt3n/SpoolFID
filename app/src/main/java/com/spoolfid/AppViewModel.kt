@@ -114,6 +114,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var linkTags by mutableStateOf(settings.linkTags); private set
     var confirmOverwrite by mutableStateOf(settings.confirmOverwrite); private set
     var autoLink by mutableStateOf(settings.autoLink); private set
+    var reportScans by mutableStateOf(settings.reportScans); private set
+    /** What Spoolman answered to the last scan report, or why it didn't take it. Shown under the setting. */
+    var reportStatus by mutableStateOf<String?>(null); private set
     var extra by mutableStateOf(ExtraFilters()); private set
     var twoTagsPerSpool by mutableStateOf(settings.twoTagsPerSpool); private set
     var keepScreenOn by mutableStateOf(settings.keepScreenOn); private set
@@ -130,6 +133,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         activeSpools = { spools },
         refreshActive = { refresh() },
         feedback = { feedback(it) },
+        reportScan = { uid, format -> reportScan(uid, format) },
     )
 
     /** Tags a spool needs to count as fully tagged. */
@@ -228,6 +232,29 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun updateAutoLink(v: Boolean) {
         autoLink = v
         settings.autoLink = v
+    }
+
+    fun updateReportScans(v: Boolean) {
+        reportScans = v
+        settings.reportScans = v
+        reportStatus = null
+    }
+
+    /** Fire and forget: reporting must never slow a scan down or fail it. Only the setting's status line hears about trouble. */
+    private fun reportScan(uid: String, format: String?) {
+        if (!settings.reportScans || !configured) return
+        val readerId = settings.readerId
+        viewModelScope.launch {
+            runCatching { withContext(Dispatchers.IO) { client().reportScan(uid, readerId, "SpoolFID", format) } }
+                .onSuccess { m ->
+                    reportStatus = "Last scan reported: " + when {
+                        m.spoolId != null -> "spool #${m.spoolId}"
+                        m.filamentId != null -> "filament #${m.filamentId}"
+                        else -> "not linked to anything"
+                    }
+                }
+                .onFailure { reportStatus = "Spoolman didn't take the scan: ${describe(it)}" }
+        }
     }
 
     fun updateExtra(f: ExtraFilters) {
@@ -450,6 +477,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 feedback(true)
                 val tagSpoolId = (r.contents as? TagContents.Written)?.payload?.spoolId?.takeIf { it >= 1 }
+                reportScan(r.uid, if (r.contents is TagContents.Written) SpoolmanClient.TAG_FORMAT else null)
                 val looked = lookUp(r.uid, r.contents, tagSpoolId)
                 read = looked
                 // Only a tag Spoolman has never seen is linked on its own; one linked elsewhere is left for the user to decide.
@@ -517,6 +545,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     TagMove.None -> ""
                 }
                 read = lookUp(r.uid, r.contents, spoolId, justLinked = "Linked to spool #$spoolId$moved")
+                // Scanned again, now that it resolves differently, so a paired browser window updates.
+                reportScan(r.uid, if (r.contents is TagContents.Written) SpoolmanClient.TAG_FORMAT else null)
                 // Keep the spool list in step with Spoolman.
                 runCatching { withContext(Dispatchers.IO) { client().getSpool(spoolId) } }.getOrNull()?.let { fresh ->
                     spools = spools.map { if (it.id == fresh.id) fresh else it }

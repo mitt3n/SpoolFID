@@ -66,6 +66,9 @@ class SpoolmanException(message: String) : Exception(message)
 
 class ServerInfo(val version: String?)
 
+/** What Spoolman made of a reported scan: the spool or filament the tag is linked to, if any. */
+data class ScanMatch(val spoolId: Int?, val filamentId: Int?)
+
 /** Where a tag was linked before it was moved to a different spool. */
 sealed interface TagMove {
     data object None : TagMove
@@ -220,6 +223,17 @@ class SpoolmanClient(rawUrl: String, private val transport: HttpTransport = UrlC
 
     fun deleteSpool(id: Int) {
         requireOk(send("DELETE", "/api/v1/spool/$id", null))
+    }
+
+    /**
+     * Tells Spoolman a tag was scanned, the way a dedicated tag reader would. Spoolman looks the tag up and shows it
+     * in any browser window paired with [readerId]. Nothing is stored; the answer is who the tag belongs to, if anyone.
+     */
+    fun reportScan(uid: String, readerId: String, readerName: String, format: String? = null): ScanMatch {
+        val body = JSONObject().put("uid", uid).put("reader_id", readerId).put("name", readerName)
+            .also { if (format != null) it.put("format", format) }.toString()
+        val o = JSONObject(request("POST", "/api/v1/tag/scan", body))
+        return ScanMatch(o.int("matched_spool_id"), o.int("matched_filament_id"))
     }
 
     /** The materials and locations already in use, to suggest while typing. */

@@ -258,3 +258,35 @@ class ManageClientTest {
         assertEquals("Spoolman returned HTTP 400: Spool weight is not set", e.message)
     }
 }
+
+class ScanReportTest {
+    private val fake = FakeSpoolman()
+
+    @org.junit.After
+    fun stop() = fake.close()
+
+    @Test
+    fun aScanIsReportedAsATagReader() {
+        fake.respond("POST /api/v1/tag/scan", 200 to """{"uid":"AA11BB22","reader_id":"spoolfid-1a2b3c4d","matched_spool_id":12,"matched_filament_id":null}""")
+        val m = fake.client().reportScan("AA11BB22", "spoolfid-1a2b3c4d", "SpoolFID", "creality")
+        assertEquals(ScanMatch(12, null), m)
+        val body = JSONObject(fake.lastBody("POST", "/api/v1/tag/scan"))
+        assertEquals("AA11BB22", body.getString("uid"))
+        assertEquals("spoolfid-1a2b3c4d", body.getString("reader_id"))
+        assertEquals("SpoolFID", body.getString("name"))
+        assertEquals("creality", body.getString("format"))
+    }
+
+    @Test
+    fun anUnlinkedTagComesBackWithNoMatchAndNoFormatIsSentWhenUnknown() {
+        fake.respond("POST /api/v1/tag/scan", 200 to """{"uid":"AA11BB22","reader_id":"r","matched_spool_id":null,"matched_filament_id":null}""")
+        assertEquals(ScanMatch(null, null), fake.client().reportScan("AA11BB22", "r", "SpoolFID"))
+        assertFalse(JSONObject(fake.lastBody("POST", "/api/v1/tag/scan")).has("format"))
+    }
+
+    @Test
+    fun anOlderSpoolmanWithoutTheEndpointFailsClearly() {
+        val e = assertThrows(SpoolmanException::class.java) { fake.client().reportScan("AA11BB22", "r", "SpoolFID") }
+        assertTrue(e.message!!.startsWith("Spoolman returned HTTP 404"))
+    }
+}

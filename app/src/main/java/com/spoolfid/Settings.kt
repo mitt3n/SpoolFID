@@ -35,6 +35,16 @@ class Settings(context: Context) {
         get() = prefs.getBoolean("autoLink", false)
         set(v) = prefs.edit { putBoolean("autoLink", v) }
 
+    /** Tell Spoolman about tags scanned on the Read and Manage tabs, so a paired browser window follows along. */
+    var reportScans: Boolean
+        get() = prefs.getBoolean("reportScans", false)
+        set(v) = prefs.edit { putBoolean("reportScans", v) }
+
+    /** Names this phone to Spoolman as a tag reader. Random, made once, and tells Spoolman nothing about you. */
+    val readerId: String
+        get() = prefs.getString("readerId", null) ?: "spoolfid-${java.util.UUID.randomUUID().toString().take(8)}"
+            .also { id -> prefs.edit { putString("readerId", id) } }
+
     var confirmOverwrite: Boolean
         get() = prefs.getBoolean("confirmOverwrite", true)
         set(v) = prefs.edit { putBoolean("confirmOverwrite", v) }

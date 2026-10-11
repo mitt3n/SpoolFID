@@ -773,6 +773,18 @@ private fun SettingsScreen(vm: AppViewModel) {
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
+                Text("Report scans to Spoolman", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    "Tells Spoolman about each tag you scan on the Read and Manage tabs, as a tag reader would. A Spoolman " +
+                        "browser window paired with this phone (pick \"SpoolFID\" as the reader there) jumps to the spool.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                vm.reportStatus?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary) }
+            }
+            Switch(checked = vm.reportScans, onCheckedChange = { vm.updateReportScans(it) })
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
                 Text("Two tags per spool", style = MaterialTheme.typography.titleMedium)
                 Text(
                     "Write a tag for each flange. The CFS only reads the tag on the side facing its reader.",

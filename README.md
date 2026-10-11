@@ -160,6 +160,7 @@ Open a spool or filament and its **Tags** section lists every tag Spoolman has l
 | Two tags per spool | Write a tag for each flange. On by default. |
 | Link tags in Spoolman | Links every tag you write to its spool in Spoolman, and takes the tag count in the list from there. On by default. |
 | Link tags when reading | On the Read tab, links a tag to the spool it names as soon as you scan it, if Spoolman doesn't have it yet. Never moves a tag from another spool. Off by default. |
+| Report scans to Spoolman | Tells Spoolman about each tag you scan on the Read and Manage tabs, the way a tag reader would. In Spoolman's web page, pick **SpoolFID** as the tag reader and the page jumps to whatever you scan. Needs a recent Spoolman. Off by default. |
 | Keep screen on | Stops the display sleeping while you write or read tags. On by default. |
 | Close "Done" screen automatically | After the last tag, returns to the list after Off / 3 / 5 / 10 seconds. The Done button shows the countdown and still works. |
 | Confirm before overwriting | Ask before replacing a tag that already has data. On by default. |

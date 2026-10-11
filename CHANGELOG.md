@@ -14,6 +14,7 @@ before tagging; the release fails if it's missing.
 - Create several identical spools at once, or duplicate a spool.
 - Hold a tag to the phone on the Manage tab to open whatever it's linked to.
 - **Tag audit** list of spools with missing, unlinked or stray tags.
+- New setting **Report scans to Spoolman** makes the phone act as a Spoolman tag reader, so a paired browser window follows what you scan.
 - New setting **Link tags when reading** links a scanned tag to its spool automatically.
 
 ## 1.2.0 - 2026-10-04
