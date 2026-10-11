@@ -46,6 +46,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
 import com.spoolfid.ReadPage
 import com.spoolfid.SettingsPage
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -874,6 +875,27 @@ private fun StepperRow(
 
 @Composable
 private fun SettingsScreen(vm: AppViewModel) {
+    if (vm.reportNoticeVisible) {
+        var dontShow by remember { mutableStateOf(false) }
+        AlertDialog(
+            onDismissRequest = { vm.dismissReportNotice(dontShow) },
+            title = { Text("Enable it on the server too") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        "Reporting scans only works if the feature is also enabled on your Spoolman server. " +
+                            "If Spoolman doesn't react to scans, check the server's settings. The status line under the " +
+                            "switch shows what Spoolman made of the last scan.",
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(checked = dontShow, onCheckedChange = { dontShow = it })
+                        Text("Don't show this again")
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { vm.dismissReportNotice(dontShow) }) { Text("OK") } },
+        )
+    }
     Column(Modifier.fillMaxSize()) {
         GroupTabs(SettingsPage.entries.map { it.label }, vm.settingsPage.ordinal) { vm.goSettings(SettingsPage.entries[it]) }
         Column(

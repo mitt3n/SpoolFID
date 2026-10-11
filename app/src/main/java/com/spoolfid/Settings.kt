@@ -52,6 +52,11 @@ class Settings(context: Context) {
         get() = prefs.getString("readerId", null) ?: "spoolfid-${java.util.UUID.randomUUID().toString().take(8)}"
             .also { id -> prefs.edit { putString("readerId", id) } }
 
+    /** The user ticked "don't show this again" on the notice shown when switching on scan reporting. */
+    var hideReportNotice: Boolean
+        get() = prefs.getBoolean("hideReportNotice", false)
+        set(v) = prefs.edit { putBoolean("hideReportNotice", v) }
+
     var confirmOverwrite: Boolean
         get() = prefs.getBoolean("confirmOverwrite", true)
         set(v) = prefs.edit { putBoolean("confirmOverwrite", v) }

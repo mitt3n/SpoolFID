@@ -176,6 +176,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var confirmOverwrite by mutableStateOf(settings.confirmOverwrite); private set
     var autoLink by mutableStateOf(settings.autoLink); private set
     var reportScans by mutableStateOf(settings.reportScans); private set
+    /** Show the notice that scan reporting has to be enabled on the Spoolman server too. */
+    var reportNoticeVisible by mutableStateOf(false); private set
     /** What Spoolman answered to the last scan report, or why it didn't take it. Shown under the setting. */
     var reportStatus by mutableStateOf<String?>(null); private set
     var extra by mutableStateOf(ExtraFilters()); private set
@@ -299,6 +301,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         reportScans = v
         settings.reportScans = v
         reportStatus = null
+        if (v && !settings.hideReportNotice) reportNoticeVisible = true
+    }
+
+    fun dismissReportNotice(dontShowAgain: Boolean) {
+        if (dontShowAgain) settings.hideReportNotice = true
+        reportNoticeVisible = false
     }
 
     /** Fire and forget: reporting must never slow a scan down or fail it. Only the setting's status line hears about trouble. */

@@ -11,6 +11,8 @@ before tagging; the release fails if it's missing.
   background. It only leaves the app from the first screen.
 - Add manufacturers and filaments from Spoolman's public filament database: browse by manufacturer, tick several
   filaments and add them in one go, creating the manufacturer if it's new.
+- Turning on **Report scans to Spoolman** shows a reminder that the feature must also be enabled on the Spoolman
+  server, with a "Don't show this again" box.
 - Settings now explains when Spoolman's web page jumps to a scanned spool, and shows what Spoolman made of the last
   scan.
 - New side panel (menu button, top left) replaces the bottom bar. Sections with several views have tabs: Read
