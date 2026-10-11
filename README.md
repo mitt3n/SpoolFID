@@ -100,6 +100,35 @@ Spoolman about the tag and tells you where it stands:
 
 Use it to check a tag before putting the spool in the printer.
 
+## Managing Spoolman
+
+The **Manage** tab edits your Spoolman inventory directly, so you don't need the web page to add a spool or fix a
+detail. Everything is saved to Spoolman as you go; SpoolFID keeps no copy of its own.
+
+Pick **Spools**, **Filaments** or **Manufacturers** at the top, search the list, and tap an entry to edit it. The
+**Add** button creates a new one.
+
+- **Manufacturers** have a name, an empty spool weight and a comment. Deleting one removes it from Spoolman.
+- **Filaments** have a name, manufacturer, material, color (or several, for multi-color), net and spool weight,
+  diameter, density, temperatures, price, article number and comment. Density fills in from the material, and
+  the material and manufacturer suggest what you already use. **Start from the filament database** searches the
+  community filament list that Spoolman provides and fills the form in for you, creating the manufacturer if it's
+  new. On an existing filament, **Add a spool of this filament** and **Duplicate this filament** save typing.
+- **Spools** belong to a filament and have a starting, spool and remaining weight, price, location, lot number
+  and comment. Switch **Archived** on to hide a spool without losing its history; the **Archived** chip on the
+  list shows them again.
+
+If Spoolman refuses a change, such as deleting a filament that still has spools, the app shows its reason.
+
+### Tags
+
+Open a spool or filament and its **Tags** section lists every tag Spoolman has linked to it.
+
+- **Link a tag by scanning it** links any tag you hold to the phone, without writing to it. If Spoolman already
+  has that tag on something else, it's moved here and you're told where it came from.
+- The bin next to a tag **unlinks** it in Spoolman. The tag keeps what's written on it.
+- On a spool, **Write tags for this spool** starts the usual write flow for it.
+
 ## Settings
 
 | Setting | What it does |

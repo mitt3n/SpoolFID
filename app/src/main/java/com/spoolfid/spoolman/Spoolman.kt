@@ -32,6 +32,13 @@ data class Spool(
     val tagsSupported: Boolean = false,
     /** Count kept in a custom extra field by older SpoolFID versions; only used when the server has no native tags. */
     val legacyTagCount: Int = 0,
+    val filamentId: Int? = null,
+    val archived: Boolean = false,
+    val price: Double? = null,
+    val spoolWeight: Double? = null,
+    val usedWeight: Double? = null,
+    val lotNr: String? = null,
+    val comment: String? = null,
 ) {
     val title: String get() = filamentName?.takeIf { it.isNotBlank() } ?: "Spool $id"
 
@@ -99,7 +106,8 @@ class SpoolmanClient(rawUrl: String, private val transport: HttpTransport = UrlC
     /** The server's version, for the connection check. */
     fun info(): ServerInfo = ServerInfo(JSONObject(request("GET", "/api/v1/info")).str("version"))
 
-    fun listSpools(): List<Spool> = parseSpools(request("GET", "/api/v1/spool?allow_archived=false"))
+    fun listSpools(includeArchived: Boolean = false): List<Spool> =
+        parseSpools(request("GET", "/api/v1/spool?allow_archived=$includeArchived"))
 
     fun getSpool(id: Int): Spool? = try {
         parseSpool(JSONObject(request("GET", "/api/v1/spool/$id")))
@@ -119,18 +127,24 @@ class SpoolmanClient(rawUrl: String, private val transport: HttpTransport = UrlC
      * Links [uid] to the spool. A tag identifies exactly one spool or filament, so if something else already holds it
      * the link is moved here (and the old holder is reported).
      */
-    fun linkTag(spoolId: Int, uid: String, format: String = TAG_FORMAT): TagMove {
-        val body = JSONObject().put("uid", uid).put("format", format).toString()
-        val path = "/api/v1/spool/$spoolId/tag"
+    fun linkTag(spoolId: Int, uid: String, format: String? = TAG_FORMAT): TagMove = link("spool", spoolId, uid, format)
+
+    /** Links [uid] to a filament, the same way: moved here if something else holds it. */
+    fun linkFilamentTag(filamentId: Int, uid: String, format: String? = null): TagMove =
+        link("filament", filamentId, uid, format)
+
+    private fun link(kind: String, id: Int, uid: String, format: String?): TagMove {
+        val body = JSONObject().put("uid", uid).also { if (format != null) it.put("format", format) }.toString()
+        val path = "/api/v1/$kind/$id/tag"
         val first = send("POST", path, body)
         if (first.code in 200..299) return TagMove.None
         if (first.code != 409) throw failure(first)
 
-        // Already linked somewhere: re-linking to the same spool is a no-op, otherwise move it.
+        // Already linked somewhere: re-linking to the same owner is a no-op, otherwise move it.
         val conflict = runCatching { JSONObject(first.body) }.getOrNull() ?: throw failure(first)
         val heldBySpool = conflict.int("spool_id")
         val heldByFilament = conflict.int("filament_id")
-        if (heldBySpool == spoolId) return TagMove.None
+        if ((kind == "spool" && heldBySpool == id) || (kind == "filament" && heldByFilament == id)) return TagMove.None
         val move = when {
             heldBySpool != null -> {
                 requireOk(send("DELETE", "/api/v1/spool/$heldBySpool/tag/$uid", null))
@@ -149,6 +163,63 @@ class SpoolmanClient(rawUrl: String, private val transport: HttpTransport = UrlC
     fun unlinkTag(spoolId: Int, uid: String) {
         requireOk(send("DELETE", "/api/v1/spool/$spoolId/tag/$uid", null))
     }
+
+    fun unlinkFilamentTag(filamentId: Int, uid: String) {
+        requireOk(send("DELETE", "/api/v1/filament/$filamentId/tag/$uid", null))
+    }
+
+    // ---- Manufacturers, filaments and spools ----
+
+    fun listVendors(): List<Vendor> = parseList(request("GET", "/api/v1/vendor")) { parseVendor(it) }
+
+    fun createVendor(form: VendorForm): Vendor =
+        parseVendor(JSONObject(request("POST", "/api/v1/vendor", form.toBody(update = false).toString())))
+
+    fun updateVendor(id: Int, form: VendorForm): Vendor =
+        parseVendor(JSONObject(request("PATCH", "/api/v1/vendor/$id", form.toBody(update = true).toString())))
+
+    fun deleteVendor(id: Int) {
+        requireOk(send("DELETE", "/api/v1/vendor/$id", null))
+    }
+
+    fun listFilaments(): List<Filament> = parseList(request("GET", "/api/v1/filament")) { parseFilament(it) }
+
+    fun getFilament(id: Int): Filament? = try {
+        parseFilament(JSONObject(request("GET", "/api/v1/filament/$id")))
+    } catch (e: SpoolmanException) {
+        if (e.message?.contains("HTTP 404") == true) null else throw e
+    }
+
+    fun createFilament(form: FilamentForm): Filament =
+        parseFilament(JSONObject(request("POST", "/api/v1/filament", form.toBody(update = false).toString())))
+
+    fun updateFilament(id: Int, form: FilamentForm): Filament =
+        parseFilament(JSONObject(request("PATCH", "/api/v1/filament/$id", form.toBody(update = true).toString())))
+
+    fun deleteFilament(id: Int) {
+        requireOk(send("DELETE", "/api/v1/filament/$id", null))
+    }
+
+    fun createSpool(form: SpoolForm): Spool =
+        parseSpool(JSONObject(request("POST", "/api/v1/spool", form.toBody(update = false).toString())))
+
+    fun updateSpool(id: Int, form: SpoolForm): Spool =
+        parseSpool(JSONObject(request("PATCH", "/api/v1/spool/$id", form.toBody(update = true).toString())))
+
+    fun deleteSpool(id: Int) {
+        requireOk(send("DELETE", "/api/v1/spool/$id", null))
+    }
+
+    /** The materials and locations already in use, to suggest while typing. */
+    fun materials(): List<String> = stringList(request("GET", "/api/v1/material"))
+
+    fun locations(): List<String> = stringList(request("GET", "/api/v1/location"))
+
+    /** Searches the community filament database Spoolman serves, so a filament can start from a known one. */
+    fun searchCatalog(query: String, limit: Int = 30): List<CatalogFilament> =
+        parseList(request("GET", "/api/v1/external/filament/search?query=${URLEncoder.encode(query.trim(), "UTF-8")}&limit=$limit")) {
+            parseCatalog(it)
+        }
 
     /**
      * Records a tag that was just written. On Spoolman with native tags the tag is linked and the spool is re-read,
@@ -206,7 +277,7 @@ class SpoolmanClient(rawUrl: String, private val transport: HttpTransport = UrlC
     private fun failure(response: HttpResponse): SpoolmanException {
         val detail = runCatching {
             val o = JSONObject(response.body)
-            o.str("message") ?: o.str("detail")
+            o.str("message") ?: describeDetail(o)
         }.getOrNull()
         return SpoolmanException("Spoolman returned HTTP ${response.code}" + (detail?.let { ": $it" } ?: ""))
     }
@@ -230,6 +301,80 @@ class SpoolmanClient(rawUrl: String, private val transport: HttpTransport = UrlC
         private fun JSONObject.str(key: String): String? = if (isNull(key)) null else getString(key)
         private fun JSONObject.num(key: String): Double? = if (isNull(key)) null else getDouble(key)
         private fun JSONObject.int(key: String): Int? = if (isNull(key)) null else getInt(key)
+
+        /** Spoolman's validation errors come as a list of {loc, msg}; a plain failure has a text "detail". */
+        private fun describeDetail(o: JSONObject): String? {
+            val arr = o.optJSONArray("detail") ?: return o.str("detail")
+            return (0 until arr.length()).mapNotNull { i ->
+                val item = arr.optJSONObject(i) ?: return@mapNotNull null
+                val field = item.optJSONArray("loc")?.let { loc -> loc.opt(loc.length() - 1)?.toString() }
+                listOfNotNull(field?.takeIf { it != "body" }, item.str("msg")).joinToString(": ")
+            }.joinToString("; ").ifEmpty { null }
+        }
+
+        private fun <T> parseList(json: String, parse: (JSONObject) -> T): List<T> {
+            val arr = JSONArray(json)
+            return (0 until arr.length()).map { parse(arr.getJSONObject(it)) }
+        }
+
+        private fun stringList(json: String): List<String> {
+            val arr = JSONArray(json)
+            return (0 until arr.length()).mapNotNull { arr.optString(it).takeIf { s -> s.isNotBlank() } }
+        }
+
+        private fun parseTags(o: JSONObject): List<SpoolTag> {
+            val arr = o.optJSONArray("tags")
+            return (0 until (arr?.length() ?: 0)).mapNotNull { i ->
+                arr!!.optJSONObject(i)?.let { t -> t.str("uid")?.let { uid -> SpoolTag(uid, t.str("format")) } }
+            }
+        }
+
+        private fun parseVendor(o: JSONObject) = Vendor(
+            id = o.getInt("id"),
+            name = o.getString("name"),
+            comment = o.str("comment"),
+            emptySpoolWeight = o.num("empty_spool_weight"),
+        )
+
+        private fun parseFilament(o: JSONObject) = Filament(
+            id = o.getInt("id"),
+            name = o.str("name"),
+            vendor = o.optJSONObject("vendor")?.let { parseVendor(it) },
+            material = o.str("material"),
+            colorHex = o.str("color_hex")?.takeIf { it.isNotBlank() },
+            multiColorHexes = o.str("multi_color_hexes")?.takeIf { it.isNotBlank() },
+            multiColorDirection = o.str("multi_color_direction"),
+            density = o.getDouble("density"),
+            diameter = o.getDouble("diameter"),
+            weight = o.num("weight"),
+            spoolWeight = o.num("spool_weight"),
+            price = o.num("price"),
+            articleNumber = o.str("article_number"),
+            comment = o.str("comment"),
+            extruderTemp = o.int("settings_extruder_temp"),
+            bedTemp = o.int("settings_bed_temp"),
+            externalId = o.str("external_id"),
+            tags = parseTags(o),
+            tagsSupported = o.has("tags"),
+        )
+
+        private fun parseCatalog(o: JSONObject): CatalogFilament {
+            val many = o.optJSONArray("color_hexes")
+            return CatalogFilament(
+                id = o.getString("id"),
+                manufacturer = o.getString("manufacturer"),
+                name = o.getString("name"),
+                material = o.getString("material"),
+                density = o.getDouble("density"),
+                diameter = o.getDouble("diameter"),
+                weight = o.getDouble("weight"),
+                spoolWeight = o.num("spool_weight"),
+                colorHex = o.str("color_hex"),
+                colorHexes = (0 until (many?.length() ?: 0)).map { many!!.getString(it) },
+                extruderTemp = o.int("extruder_temp"),
+                bedTemp = o.int("bed_temp"),
+            )
+        }
 
         private fun parseSpools(json: String): List<Spool> {
             val arr = JSONArray(json)
@@ -263,6 +408,13 @@ class SpoolmanClient(rawUrl: String, private val transport: HttpTransport = UrlC
                 extra = extra,
                 tags = tags,
                 tagsSupported = o.has("tags"),
+                filamentId = f?.int("id"),
+                archived = o.optBoolean("archived", false),
+                price = o.num("price"),
+                spoolWeight = o.num("spool_weight"),
+                usedWeight = o.num("used_weight"),
+                lotNr = o.str("lot_nr"),
+                comment = o.str("comment"),
                 legacyTagCount = extra[TAGS_FIELD]?.trim('"')?.toIntOrNull()
                     ?: if (extra[LEGACY_FIELD] == "true") 1 else 0,
             )

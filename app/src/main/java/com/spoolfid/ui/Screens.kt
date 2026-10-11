@@ -23,6 +23,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
@@ -96,8 +97,8 @@ import com.spoolfid.spoolman.Spool
 import com.spoolfid.spoolman.TagLinkStatus
 import kotlin.math.roundToInt
 
-private val SuccessGreen = Color(0xFF2E7D32)
-private val WarnAmber = Color(0xFFB26A00)
+internal val SuccessGreen = Color(0xFF2E7D32)
+internal val WarnAmber = Color(0xFFB26A00)
 
 @Composable
 fun SpoolFIDTheme(content: @Composable () -> Unit) {
@@ -114,6 +115,7 @@ fun SpoolFIDTheme(content: @Composable () -> Unit) {
 private fun Tab.icon(): ImageVector = when (this) {
     Tab.WRITE -> Icons.Default.Edit
     Tab.READ -> Icons.Default.Search
+    Tab.MANAGE -> Icons.Default.Build
     Tab.SETTINGS -> Icons.Default.Settings
 }
 
@@ -123,7 +125,7 @@ fun App(vm: AppViewModel) {
 
     // Keep the display awake while tags are being written or read, if enabled.
     val view = LocalView.current
-    val keepOn = vm.keepScreenOn && (session != null || vm.tab == Tab.READ)
+    val keepOn = vm.keepScreenOn && (session != null || vm.tab == Tab.READ || vm.library.scanTarget != null)
     DisposableEffect(keepOn) {
         view.keepScreenOn = keepOn
         onDispose { view.keepScreenOn = false }
@@ -132,6 +134,11 @@ fun App(vm: AppViewModel) {
     if (session != null) {
         BackHandler { vm.stopSession() }
         Surface(Modifier.fillMaxSize()) { SessionScreen(vm, session) }
+        return
+    }
+    if (vm.library.editor != null) {
+        BackHandler { vm.library.closeEditor() }
+        Surface(Modifier.fillMaxSize()) { EditorScreen(vm) }
         return
     }
     Scaffold(
@@ -152,6 +159,7 @@ fun App(vm: AppViewModel) {
             when (vm.tab) {
                 Tab.WRITE -> SpoolListScreen(vm)
                 Tab.READ -> ReadScreen(vm)
+                Tab.MANAGE -> ManageScreen(vm)
                 Tab.SETTINGS -> SettingsScreen(vm)
             }
         }
@@ -160,7 +168,7 @@ fun App(vm: AppViewModel) {
 
 // ---------------------------------------------------------------- shared bits
 
-private fun hexColor(hex: String?): Color = try {
+internal fun hexColor(hex: String?): Color = try {
     val h = hex?.removePrefix("#")?.take(6) ?: ""
     if (h.length == 6) Color(android.graphics.Color.parseColor("#$h")) else Color.Gray
 } catch (_: IllegalArgumentException) {
@@ -168,7 +176,7 @@ private fun hexColor(hex: String?): Color = try {
 }
 
 @Composable
-private fun Swatch(hex: String?, size: androidx.compose.ui.unit.Dp) {
+internal fun Swatch(hex: String?, size: androidx.compose.ui.unit.Dp) {
     Box(
         Modifier
             .size(size)
@@ -178,12 +186,12 @@ private fun Swatch(hex: String?, size: androidx.compose.ui.unit.Dp) {
     )
 }
 
-private fun Spool.subtitle(): String =
+internal fun Spool.subtitle(): String =
     listOfNotNull(vendor, material, remainingWeight?.let { "${it.roundToInt()} g left" }, location?.takeIf { it.isNotBlank() })
         .joinToString(" · ")
 
 @Composable
-private fun NfcBanner(status: NfcStatus) {
+internal fun NfcBanner(status: NfcStatus) {
     val text = when (status) {
         NfcStatus.OK -> return
         NfcStatus.DISABLED -> "NFC is turned off."
@@ -380,7 +388,7 @@ private fun SpoolRow(
 
 /** Green when the spool has all the tags it should, amber when only some are written. */
 @Composable
-private fun TagBadge(count: Int, required: Int, unlinked: Int) {
+internal fun TagBadge(count: Int, required: Int, unlinked: Int) {
     val done = count >= required
     // Tags known only from an earlier version: counted, but still to be linked in Spoolman.
     val color = when {

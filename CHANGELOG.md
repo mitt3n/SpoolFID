@@ -3,6 +3,13 @@
 Each release's notes on GitHub are taken from its section here. Add the new version's section (`## X.Y.Z - date`)
 before tagging; the release fails if it's missing.
 
+## Unreleased
+
+- New **Manage** tab: add, edit and delete manufacturers, filaments and spools in Spoolman without leaving the app,
+  and archive or restore spools.
+- New filaments can start from the community filament database that Spoolman serves.
+- See, unlink and link the tags on any spool or filament (link by scanning a tag), or write a spool's tags from its page.
+
 ## 1.2.0 - 2026-10-04
 
 - Added filter chips to the Write list: **To do** (default), **All**, **Untagged**, **Partly tagged** and

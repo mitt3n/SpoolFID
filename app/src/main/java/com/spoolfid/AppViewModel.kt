@@ -17,6 +17,7 @@ import com.spoolfid.nfc.TagContents
 import com.spoolfid.nfc.TagException
 import com.spoolfid.nfc.TagIo
 import com.spoolfid.nfc.toHex
+import com.spoolfid.spoolman.FormError
 import com.spoolfid.spoolman.Spool
 import com.spoolfid.spoolman.SpoolmanClient
 import com.spoolfid.spoolman.SpoolmanException
@@ -28,7 +29,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-enum class Tab(val label: String) { WRITE("Write"), READ("Read"), SETTINGS("Settings") }
+enum class Tab(val label: String) { WRITE("Write"), READ("Read"), MANAGE("Manage"), SETTINGS("Settings") }
 
 enum class NfcStatus { OK, DISABLED, UNSUPPORTED, NO_MIFARE }
 
@@ -119,6 +120,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     val configured: Boolean get() = settings.spoolmanUrl.isNotBlank()
 
+    /** Manufacturers, filaments, spools and their tags, edited straight in Spoolman. */
+    val library = Library(
+        scope = viewModelScope,
+        client = { client() },
+        describe = { describe(it) },
+        activeSpools = { spools },
+        refreshActive = { refresh() },
+        feedback = { feedback(it) },
+    )
+
     /** Tags a spool needs to count as fully tagged. */
     val requiredTags: Int get() = if (twoTagsPerSpool) 2 else 1
 
@@ -138,7 +149,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private fun describe(e: Throwable): String =
-        if (e is SpoolmanException) e.message ?: "Spoolman error" else "Unexpected response - is this a Spoolman server?"
+        if (e is SpoolmanException || e is FormError) e.message ?: "Spoolman error" else "Unexpected response - is this a Spoolman server?"
 
     fun refresh() {
         if (!configured) return
@@ -305,6 +316,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val s = session
         when {
             s != null -> if (s.phase == Phase.WAITING || s.phase == Phase.ERROR || s.phase == Phase.CONFIRM) writeTag(tag, s)
+            library.scanTarget != null -> library.onTag(tag.id.toHex())
             tab == Tab.READ -> readTag(tag)
         }
     }
