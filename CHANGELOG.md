@@ -3,38 +3,24 @@
 Each release's notes on GitHub are taken from its section here. Add the new version's section (`## X.Y.Z - date`)
 before tagging; the release fails if it's missing.
 
-## Unreleased
+## 1.3.0 - 2026-10-11
 
-- Print QR labels for your spools from the new **Labels** section, on a sheet or to a label printer, in a size you
-  choose. They use Spoolman's own spool codes, so they work in Spoolman's scanner too.
-- Scan QR labels with the camera (Read → Scan a label) to open a spool. This asks for the camera permission, only
-  when you use it.
-- Tags per spool is now a number, 1 to 6 (it was a two-or-one switch), still 2 by default. The seconds before the Done
-  screen closes is also a number, 0 to 60, and now defaults to 3.
-- The back gesture now returns to the previous screen, or clears a selection, instead of sending the app to the
-  background. It only leaves the app from the first screen.
-- Searching for a filament, when adding a spool or on the Filaments tab, also shows matches from Spoolman's public
-  database; tap one to add it (and its manufacturer if new) and use it.
-- Add manufacturers and filaments from Spoolman's public filament database: browse by manufacturer, tick several
-  filaments and add them in one go, creating the manufacturer if it's new.
-- Turning on **Report scans to Spoolman** shows a short how-to for making Spoolman's page jump to scans, with a
-  "Don't show this again" box.
-- Settings now explains when Spoolman's web page jumps to a scanned spool, and shows what Spoolman made of the last
+- **Side panel** (menu button, top left) replaces the bottom bar, with tabs inside each section. The back gesture now
+  returns to the previous screen instead of closing the app.
+- **Manage** your Spoolman from the app: add, edit and delete manufacturers, filaments and spools, archive spools,
+  weigh a spool in, create several spools at once or duplicate one.
+- **Spoolman's public filament database**: matches show up when you search for a filament, and you can browse by
+  manufacturer and add several filaments (and new manufacturers) at once.
+- **Tags**: see, link and unlink the tags on any spool or filament; **Find a spool** opens what a tag is linked to;
+  **Tag audit** lists spools with missing, unlinked or stray tags; new setting **Link tags when reading**.
+- **QR labels**: print them from the new **Labels** section (sheet or label printer, any size) and scan them with
+  the camera (Read → Scan a label). They use Spoolman's own codes. The camera permission is asked for only when you
   scan.
-- New side panel (menu button, top left) replaces the bottom bar. Sections with several views have tabs: Read
-  (Read a tag, Find a spool), Manage (Spools, Filaments, Manufacturers) and Settings (Spoolman, Writing, Reading).
-  Tag audit is its own section.
-- New **Manage** tab: add, edit and delete manufacturers, filaments and spools in Spoolman without leaving the app,
-  and archive or restore spools.
-- New filaments can start from the community filament database that Spoolman serves.
-- See, unlink and link the tags on any spool or filament (link by scanning a tag), or write a spool's tags from its page.
-- Write list: new **Needs attention**, **Low**, **Material** and **Location** filters that combine with the tag chips.
-- Weigh in a spool from its page: enter the scale reading and Spoolman works out what's left.
-- Create several identical spools at once, or duplicate a spool.
-- Hold a tag to the phone on Read → Find a spool to open whatever it's linked to.
-- **Tag audit** list of spools with missing, unlinked or stray tags.
-- New setting **Report scans to Spoolman** makes the phone act as a Spoolman tag reader, so a paired browser window follows what you scan.
-- New setting **Link tags when reading** links a scanned tag to its spool automatically.
+- **Report scans to Spoolman** (off by default) makes the phone act as a Spoolman tag reader, so Spoolman's web page
+  can jump to what you scan. A how-to shows when you turn it on.
+- Write list: new **Needs attention**, **Low**, **Material** and **Location** filters.
+- Tags per spool is now a number from 1 to 6 (still 2 by default), and the Done screen closes after a number of
+  seconds you choose, 3 by default.
 
 ## 1.2.0 - 2026-10-04
 
