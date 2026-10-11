@@ -9,6 +9,7 @@ import com.spoolfid.spoolman.FilamentForm
 import com.spoolfid.spoolman.Spool
 import com.spoolfid.spoolman.SpoolForm
 import com.spoolfid.spoolman.SpoolmanClient
+import com.spoolfid.spoolman.SpoolmanException
 import com.spoolfid.spoolman.TagMove
 import com.spoolfid.spoolman.Vendor
 import com.spoolfid.spoolman.VendorForm
@@ -17,7 +18,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-enum class Section(val label: String) { SPOOLS("Spools"), FILAMENTS("Filaments"), MANUFACTURERS("Manufacturers") }
+enum class Section(val label: String) {
+    SPOOLS("Spools"),
+    FILAMENTS("Filaments"),
+    MANUFACTURERS("Manufacturers"),
+    AUDIT("Tag audit"),
+}
 
 /** The form that is open, with what it starts out holding. `id` is null while creating. */
 sealed interface Editor {
@@ -136,11 +142,15 @@ class Library(
 
     fun edit(vendor: Vendor) = open(Editor.OfVendor(vendor.id, VendorForm.of(vendor)))
 
+    /** A new spool that starts as a copy of [spool]: same filament and details, full, with no tags. */
+    fun duplicate(spool: Spool) = open(Editor.OfSpool(null, SpoolForm.duplicateOf(spool)))
+
     /** A new filament that starts as a copy of [filament]. */
     fun duplicate(filament: Filament) = open(Editor.OfFilament(null, FilamentForm.of(filament)))
 
     private fun open(e: Editor) {
         formError = null
+        weighMessage = null
         scanTarget = null
         scanMessage = null
         catalogResults = emptyList()
@@ -178,8 +188,22 @@ class Library(
         }
     }
 
-    fun saveSpool(id: Int?, form: SpoolForm) = act({ c ->
-        if (id == null) "Created spool #${c.createSpool(form).id}" else c.updateSpool(id, form).let { "Saved spool #${it.id}" }
+    fun saveSpool(id: Int?, form: SpoolForm, copies: Int = 1) = act({ c ->
+        when {
+            id != null -> c.updateSpool(id, form).let { "Saved spool #${it.id}" }
+            copies == 1 -> "Created spool #${c.createSpool(form).id}"
+            else -> {
+                val made = mutableListOf<Int>()
+                try {
+                    repeat(copies) { made += c.createSpool(form).id }
+                } catch (e: SpoolmanException) {
+                    // Say how far it got, so nothing is created twice by trying again.
+                    val done = if (made.isEmpty()) "None were created" else "Created ${made.joinToString { "#$it" }} before this"
+                    throw SpoolmanException("${e.message}. $done.")
+                }
+                "Created spools " + made.joinToString { "#$it" }
+            }
+        }
     })
 
     fun saveFilament(id: Int?, form: FilamentForm) = act({ c ->
@@ -252,6 +276,65 @@ class Library(
             }.onSuccess { vendor -> onReady(FilamentForm.of(entry, vendor.id)) }
                 .onFailure { formError = describe(it) }
             saving = false
+        }
+    }
+
+    // ---- Weighing in ----
+
+    var weighMessage by mutableStateOf<String?>(null)
+
+    /** Sets a spool's remaining weight from a scale reading of the whole spool; Spoolman subtracts the empty spool. */
+    fun weighIn(id: Int, text: String, onDone: (Spool) -> Unit) {
+        val grams = text.trim().replace(',', '.').toDoubleOrNull()?.takeIf { it > 0.0 }
+        if (grams == null) {
+            weighMessage = "Enter the scale reading in grams"
+            return
+        }
+        if (saving) return
+        saving = true
+        weighMessage = null
+        scope.launch {
+            runCatching { withContext(Dispatchers.IO) { client().measureSpool(id, grams) } }
+                .onSuccess { fresh ->
+                    feedback(true)
+                    refreshActive()
+                    if (fresh.archived) archived = archived.map { if (it.id == fresh.id) fresh else it }
+                    weighMessage = "Remaining weight is now ${fresh.remainingWeight?.let { com.spoolfid.spoolman.formatNumber(Math.round(it * 10) / 10.0) } ?: "unknown"} g"
+                    onDone(fresh)
+                }
+                .onFailure {
+                    feedback(false)
+                    weighMessage = describe(it)
+                }
+            saving = false
+        }
+    }
+
+    // ---- Finding by tag ----
+
+    /** A tag was held to the phone on the Manage tab: open whatever it is linked to. */
+    fun findByTag(uid: String) {
+        scope.launch {
+            spools().firstOrNull { it.hasTag(uid) }?.let { found ->
+                feedback(true)
+                edit(found)
+                return@launch
+            }
+            filaments.firstOrNull { f -> f.tags.any { it.uid.equals(uid, ignoreCase = true) } }?.let { found ->
+                feedback(true)
+                edit(found)
+                return@launch
+            }
+            // Not in what's loaded: ask Spoolman, in case it changed since.
+            runCatching { withContext(Dispatchers.IO) { client().spoolsWithTag(uid).firstOrNull() } }
+                .onSuccess { found ->
+                    feedback(found != null)
+                    if (found != null) edit(found) else notice = "Tag $uid isn't linked to anything in Spoolman"
+                }
+                .onFailure {
+                    feedback(false)
+                    notice = describe(it)
+                }
         }
     }
 

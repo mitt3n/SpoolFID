@@ -38,6 +38,8 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
@@ -68,6 +70,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalView
@@ -283,6 +286,7 @@ private fun SpoolListScreen(vm: AppViewModel) {
                 )
             }
         }
+        ExtraFilterRow(vm)
         Text(
             "Showing ${visible.size} of ${vm.spools.size} spools",
             style = MaterialTheme.typography.bodySmall,
@@ -383,6 +387,62 @@ private fun SpoolRow(
             Spacer(Modifier.width(8.dp))
         }
         if (selecting) Checkbox(checked = selected, onCheckedChange = null)
+    }
+}
+
+/** Filters that combine with the tag chips: spools that will print wrong, running low, and a material or location. */
+@Composable
+private fun ExtraFilterRow(vm: AppViewModel) {
+    val f = vm.extra
+    val attention = vm.attentionCount()
+    val low = vm.lowCount()
+    val materials = vm.materialsInUse()
+    val locations = vm.locationsInUse()
+    if (attention == 0 && low == 0 && materials.size < 2 && locations.isEmpty() && !f.active) return
+    Row(
+        Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        if (attention > 0 || f.attention) {
+            FilterChip(
+                selected = f.attention,
+                onClick = { vm.updateExtra(f.copy(attention = !f.attention)) },
+                label = { Text("Needs attention · $attention") },
+            )
+        }
+        if (low > 0 || f.low) {
+            FilterChip(
+                selected = f.low,
+                onClick = { vm.updateExtra(f.copy(low = !f.low)) },
+                label = { Text("Low · $low") },
+            )
+        }
+        if (materials.size > 1 || f.material != null) {
+            MenuChip("Material", f.material, materials) { vm.updateExtra(f.copy(material = it)) }
+        }
+        if (locations.isNotEmpty() || f.location != null) {
+            MenuChip("Location", f.location, locations) { vm.updateExtra(f.copy(location = it)) }
+        }
+    }
+}
+
+/** A chip that opens a menu of choices; picking the chosen one again, or "Any", clears it. */
+@Composable
+private fun MenuChip(label: String, selected: String?, options: List<String>, onPick: (String?) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    Box {
+        FilterChip(
+            selected = selected != null,
+            onClick = { open = true },
+            label = { Text(selected ?: label) },
+        )
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            DropdownMenuItem(text = { Text("Any") }, onClick = { onPick(null); open = false })
+            options.forEach { o ->
+                DropdownMenuItem(text = { Text(o) }, onClick = { onPick(if (o == selected) null else o); open = false })
+            }
+        }
     }
 }
 
@@ -699,6 +759,17 @@ private fun SettingsScreen(vm: AppViewModel) {
                 )
             }
             Switch(checked = vm.linkTags, onCheckedChange = { vm.updateLinkTags(it) })
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("Link tags when reading", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    "On the Read tab, link a tag to the spool it names as soon as you scan it, if Spoolman doesn't have it yet. " +
+                        "A tag Spoolman has on a different spool is never moved without asking.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+            Switch(checked = vm.autoLink, onCheckedChange = { vm.updateAutoLink(it) })
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {

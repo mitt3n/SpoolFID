@@ -42,6 +42,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.spoolfid.AppViewModel
+import com.spoolfid.AuditItem
 import com.spoolfid.Library
 import com.spoolfid.Section
 import com.spoolfid.Tab
@@ -78,6 +79,8 @@ internal fun ManageScreen(vm: AppViewModel) {
     val spools = allSpools.filter { (lib.showArchived || !it.archived) && matches("#${it.id}", it.title, it.vendor, it.material, it.location, it.lotNr) }
     val filaments = lib.filaments.filter { matches("#${it.id}", it.title, it.vendor?.name, it.material, it.articleNumber) }
     val vendors = lib.vendors.filter { matches(it.name, it.comment) }
+    val audit = vm.auditItems()
+    val auditShown = audit.filter { matches("#${it.spool.id}", it.spool.title, it.issue) }
 
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
@@ -109,6 +112,7 @@ internal fun ManageScreen(vm: AppViewModel) {
                         Section.SPOOLS -> allSpools.count { lib.showArchived || !it.archived }
                         Section.FILAMENTS -> lib.filaments.size
                         Section.MANUFACTURERS -> lib.vendors.size
+                        Section.AUDIT -> audit.size
                     }
                     FilterChip(
                         selected = lib.section == s,
@@ -126,6 +130,20 @@ internal fun ManageScreen(vm: AppViewModel) {
             }
 
             if (lib.loading) LinearProgressIndicator(Modifier.fillMaxWidth().padding(top = 4.dp))
+            if (lib.section == Section.AUDIT) {
+                Text(
+                    "Spools whose tags need attention. Tap one to fix it.",
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                )
+            } else if (lib.notice == null) {
+                Text(
+                    "Hold a tag to the phone to open what it's linked to.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                )
+            }
 
             lib.loadError?.let { err ->
                 Card(
@@ -162,11 +180,19 @@ internal fun ManageScreen(vm: AppViewModel) {
                         VendorItem(v, filamentCount = lib.filaments.count { it.vendor?.id == v.id }) { lib.edit(v) }
                         HorizontalDivider()
                     }
+                    Section.AUDIT -> items(auditShown, key = { "a${it.spool.id}${it.issue}" }) { item ->
+                        AuditRow(item) { lib.edit(item.spool) }
+                        HorizontalDivider()
+                    }
                 }
-                if (isEmpty(lib, spools, filaments, vendors) && !lib.loading && lib.loadError == null) {
+                if (isEmpty(lib, spools, filaments, vendors, auditShown) && !lib.loading && lib.loadError == null) {
                     item {
                         Text(
-                            if (q.isNotEmpty()) "Nothing matches" else "Nothing here yet. Use Add to create the first one.",
+                            when {
+                                q.isNotEmpty() -> "Nothing matches"
+                                lib.section == Section.AUDIT -> "Every spool has the tags it needs"
+                                else -> "Nothing here yet. Use Add to create the first one."
+                            },
                             Modifier.fillMaxWidth().padding(32.dp),
                             textAlign = TextAlign.Center,
                         )
@@ -177,12 +203,13 @@ internal fun ManageScreen(vm: AppViewModel) {
             }
         }
 
-        ExtendedFloatingActionButton(
+        if (lib.section != Section.AUDIT) ExtendedFloatingActionButton(
             onClick = {
                 when (lib.section) {
                     Section.SPOOLS -> lib.newSpool()
                     Section.FILAMENTS -> lib.newFilament()
                     Section.MANUFACTURERS -> lib.newVendor()
+                    Section.AUDIT -> Unit
                 }
             },
             icon = { Icon(Icons.Default.Add, null) },
@@ -192,6 +219,7 @@ internal fun ManageScreen(vm: AppViewModel) {
                         Section.SPOOLS -> "Add spool"
                         Section.FILAMENTS -> "Add filament"
                         Section.MANUFACTURERS -> "Add manufacturer"
+                        Section.AUDIT -> ""
                     },
                 )
             },
@@ -200,12 +228,28 @@ internal fun ManageScreen(vm: AppViewModel) {
     }
 }
 
-private fun isEmpty(lib: Library, spools: List<Spool>, filaments: List<Filament>, vendors: List<Vendor>): Boolean =
+private fun isEmpty(lib: Library, spools: List<Spool>, filaments: List<Filament>, vendors: List<Vendor>, audit: List<AuditItem>): Boolean =
     when (lib.section) {
         Section.SPOOLS -> spools.isEmpty()
         Section.FILAMENTS -> filaments.isEmpty()
         Section.MANUFACTURERS -> vendors.isEmpty()
+        Section.AUDIT -> audit.isEmpty()
     }
+
+@Composable
+private fun AuditRow(item: AuditItem, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Swatch(item.spool.colorHex, 36.dp)
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text("#${item.spool.id}  ${item.spool.title}", style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(item.issue, style = MaterialTheme.typography.bodyMedium, color = WarnAmber)
+        }
+    }
+}
 
 @Composable
 private fun SpoolItem(spool: Spool, requiredTags: Int, onClick: () -> Unit) {

@@ -197,3 +197,29 @@ class FormsTest {
         assertEquals(3, body.getInt("filament_id"))
     }
 }
+
+class SpoolCopiesTest {
+    @Test
+    fun copiesDefaultToOneAndAreLimited() {
+        assertEquals(1, parseCopies(""))
+        assertEquals(5, parseCopies(" 5 "))
+        assertEquals("Create between 1 and 50 spools at a time", assertThrows(FormError::class.java) { parseCopies("0") }.message)
+        assertEquals("Create between 1 and 50 spools at a time", assertThrows(FormError::class.java) { parseCopies("51") }.message)
+        assertEquals("The number of spools must be a whole number", assertThrows(FormError::class.java) { parseCopies("two") }.message)
+    }
+
+    @Test
+    fun aDuplicateStartsFullAndActive() {
+        val s = Spool(
+            id = 7, filamentName = "Black", vendor = null, material = "PLA", colorHex = "000000", filamentWeight = 1000.0,
+            initialWeight = 1000.0, remainingWeight = 120.0, location = "Shelf", extra = emptyMap(), filamentId = 3,
+            archived = true, lotNr = "L-1",
+        )
+        val body = SpoolForm.duplicateOf(s).toBody(update = false)
+        assertEquals(3, body.getInt("filament_id"))
+        assertEquals("Shelf", body.getString("location"))
+        assertEquals("L-1", body.getString("lot_nr"))
+        assertFalse(body.getBoolean("archived"))
+        assertFalse("a copy is a full spool", body.has("remaining_weight"))
+    }
+}

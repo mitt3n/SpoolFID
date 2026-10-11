@@ -30,6 +30,11 @@ class Settings(context: Context) {
         get() = prefs.getInt("doneCloseSeconds", 5)
         set(v) = prefs.edit { putInt("doneCloseSeconds", v) }
 
+    /** On the Read tab, link a tag that names a spool as soon as it's scanned, without asking. */
+    var autoLink: Boolean
+        get() = prefs.getBoolean("autoLink", false)
+        set(v) = prefs.edit { putBoolean("autoLink", v) }
+
     var confirmOverwrite: Boolean
         get() = prefs.getBoolean("confirmOverwrite", true)
         set(v) = prefs.edit { putBoolean("confirmOverwrite", v) }

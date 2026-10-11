@@ -58,6 +58,7 @@ import com.spoolfid.ScanTarget
 import com.spoolfid.spoolman.CatalogFilament
 import com.spoolfid.spoolman.Filament
 import com.spoolfid.spoolman.FilamentForm
+import com.spoolfid.spoolman.FormError
 import com.spoolfid.spoolman.SpoolTag
 import com.spoolfid.spoolman.SpoolForm
 import com.spoolfid.spoolman.Vendor
@@ -65,6 +66,7 @@ import com.spoolfid.spoolman.VendorForm
 import com.spoolfid.spoolman.defaultDensity
 import com.spoolfid.spoolman.formatNumber
 import com.spoolfid.spoolman.normalizeHex
+import com.spoolfid.spoolman.parseCopies
 
 private val CommonMaterials = listOf("PLA", "PLA+", "PETG", "ABS", "ASA", "TPU", "PC", "PA", "PLA-CF", "PETG-CF", "PA-CF")
 
@@ -240,10 +242,22 @@ private fun SpoolEditor(vm: AppViewModel, e: Editor.OfSpool) {
     val lib = vm.library
     var form by remember(e) { mutableStateOf(e.form) }
     var picking by remember { mutableStateOf(false) }
+    var copies by remember(e) { mutableStateOf("1") }
+    var scale by remember(e) { mutableStateOf("") }
     val filament = form.filamentId?.let { lib.filament(it) }
     val existing = e.id?.let { lib.spool(it) }
 
-    EditorFrame(if (e.id == null) "New spool" else "Spool #${e.id}", lib, onSave = { lib.saveSpool(e.id, form) }) {
+    EditorFrame(
+        if (e.id == null) "New spool" else "Spool #${e.id}",
+        lib,
+        onSave = {
+            try {
+                lib.saveSpool(e.id, form, if (e.id == null) parseCopies(copies) else 1)
+            } catch (err: FormError) {
+                lib.formError = err.message
+            }
+        },
+    ) {
         OutlinedButton(onClick = { picking = true }, Modifier.fillMaxWidth().heightIn(min = 56.dp)) {
             if (filament != null) Swatch(filament.displayColor, 28.dp)
             if (filament != null) Spacer(Modifier.width(12.dp))
@@ -270,6 +284,9 @@ private fun SpoolEditor(vm: AppViewModel, e: Editor.OfSpool) {
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        if (e.id == null) {
+            Field("How many spools", copies, { copies = it }, whole = true)
+        }
         Field("Location", form.location, { form = form.copy(location = it) })
         Suggestions(lib.locations.filter { it != form.location && it.contains(form.location, ignoreCase = true) }) {
             form = form.copy(location = it)
@@ -287,12 +304,30 @@ private fun SpoolEditor(vm: AppViewModel, e: Editor.OfSpool) {
         }
 
         if (existing != null) {
+            HorizontalDivider()
+            Text("Weigh in", style = MaterialTheme.typography.titleMedium)
+            Text(
+                "Put the whole spool on the scale and enter the reading. Spoolman subtracts the empty spool's weight.",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Field("Scale reading", scale, { scale = it }, Modifier.weight(1f), number = true, suffix = "g")
+                Button(onClick = {
+                    lib.weighIn(existing.id, scale) { fresh ->
+                        val remaining = fresh.remainingWeight?.let { formatNumber(Math.round(it * 10) / 10.0) }.orEmpty()
+                        form = form.copy(remainingWeight = remaining, originalRemaining = remaining)
+                        scale = ""
+                    }
+                }, enabled = !lib.saving) { Text("Update") }
+            }
+            lib.weighMessage?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
             TagsSection(
                 lib, ScanTarget(filament = false, id = existing.id), existing.tags, existing.tagsSupported, existing.unlinkedCount,
             ) {
                 Button(onClick = { vm.startSession(listOf(existing)) }, Modifier.fillMaxWidth()) { Text("Write tags for this spool") }
             }
             HorizontalDivider()
+            OutlinedButton(onClick = { lib.duplicate(existing) }, Modifier.fillMaxWidth()) { Text("Duplicate this spool") }
             DeleteButton(
                 "Delete spool",
                 "Delete spool #${existing.id}?",

@@ -228,6 +228,15 @@ data class FilamentForm(
     }
 }
 
+/** How many identical spools to create at once. */
+fun parseCopies(text: String): Int {
+    val t = text.trim()
+    if (t.isEmpty()) return 1
+    val n = t.toIntOrNull() ?: throw FormError("The number of spools must be a whole number")
+    if (n !in 1..50) throw FormError("Create between 1 and 50 spools at a time")
+    return n
+}
+
 data class SpoolForm(
     val filamentId: Int? = null,
     /** Net weight of the filament on a full spool; empty falls back to the filament's own. */
@@ -276,6 +285,9 @@ data class SpoolForm(
             archived = s.archived,
             originalRemaining = s.remainingWeight?.let { formatNumber(Math.round(it * 10) / 10.0) }.orEmpty(),
         )
+
+        /** A new spool like [s]: same filament and details, but full, active and without its tags. */
+        fun duplicateOf(s: Spool) = of(s).copy(remainingWeight = "", originalRemaining = "", archived = false)
 
         /** A new spool of [f], starting full. */
         fun newOf(f: Filament) = SpoolForm(

@@ -42,6 +42,14 @@ data class Spool(
 ) {
     val title: String get() = filamentName?.takeIf { it.isNotBlank() } ?: "Spool $id"
 
+    /** How much of a full spool is left, 0 to 1; null when Spoolman doesn't know. */
+    val fractionLeft: Double?
+        get() {
+            val full = initialWeight ?: filamentWeight
+            val left = remainingWeight
+            return if (full == null || full <= 0.0 || left == null) null else (left / full).coerceIn(0.0, 1.0)
+        }
+
     /**
      * Spoolman is the source of truth: the tags it has linked. A spool with none linked yet falls back to the count
      * SpoolFID 1.0 recorded, which is how tags written before linking existed are remembered.
@@ -205,6 +213,10 @@ class SpoolmanClient(rawUrl: String, private val transport: HttpTransport = UrlC
 
     fun updateSpool(id: Int, form: SpoolForm): Spool =
         parseSpool(JSONObject(request("PATCH", "/api/v1/spool/$id", form.toBody(update = true).toString())))
+
+    /** Sets the remaining weight from the scale: [grossWeight] is the whole spool, empty spool included. */
+    fun measureSpool(id: Int, grossWeight: Double): Spool =
+        parseSpool(JSONObject(request("PUT", "/api/v1/spool/$id/measure", JSONObject().put("weight", grossWeight).toString())))
 
     fun deleteSpool(id: Int) {
         requireOk(send("DELETE", "/api/v1/spool/$id", null))

@@ -45,6 +45,26 @@ class MaterialCatalog {
     private fun fallback(reason: String): Pair<MaterialEntry, String?> =
         MaterialEntry(GENERIC.getValue("PLA"), "Generic PLA") to "$reason - using Generic PLA"
 
+    /**
+     * What will make this spool come out wrong on the printer, in plain words. Empty means it's fine. A material that
+     * only needed a suffix dropped ("PLA+" as PLA) isn't a problem; one with no match at all is.
+     */
+    fun problems(spool: Spool): List<String> {
+        val m = map(spool)
+        val grams = spool.filamentWeight ?: spool.initialWeight
+        return listOfNotNull(
+            if (spool.id <= 1) "Spool #${spool.id} is treated as 'no ID' by the printer" else null,
+            m.materialNote?.takeIf { it.endsWith("using Generic PLA") },
+            m.colorNote,
+            m.weightNote,
+            if (grams != null && kotlin.math.abs(grams - m.payload.weight.grams) > 1.0) {
+                "${grams.toInt()} g is written on the tag as ${m.payload.weight.grams} g"
+            } else {
+                null
+            },
+        )
+    }
+
     fun map(spool: Spool): Mapped {
         val (material, note) = match(spool)
         val grams = spool.filamentWeight ?: spool.initialWeight

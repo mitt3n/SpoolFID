@@ -72,6 +72,18 @@ list. Your choice is remembered.
 The search box works together with the chips, and any spools you've selected stay visible while you change
 filters.
 
+### More filters
+
+Under the tag chips, a second row narrows the list further. Each chip only appears when it would show something.
+
+| Chip | Shows |
+|---|---|
+| **Needs attention** | Spools that will come out wrong on the printer: no color, a multi-color filament, a material with no Creality match, a weight that gets rounded to a different size, or spool #1. |
+| **Low** | Spools with less than a fifth of their filament left. |
+| **Material** / **Location** | Only spools of one material or in one location. |
+
+They combine with each other and with the tag chips.
+
 ### Two tags per spool
 
 Put a tag on **each flange** of the spool and write both for the same spool. Genuine Creality spools carry
@@ -120,6 +132,17 @@ Pick **Spools**, **Filaments** or **Manufacturers** at the top, search the list,
 
 If Spoolman refuses a change, such as deleting a filament that still has spools, the app shows its reason.
 
+Other things the Manage tab does:
+
+- **Weigh in:** on a spool, enter the scale reading of the whole spool and tap **Update**. Spoolman subtracts the
+  empty spool's weight to get the remaining filament.
+- **Several spools at once:** when adding a spool, **How many spools** creates that many identical ones.
+  **Duplicate this spool** starts a new one from an existing spool, full and without tags.
+- **Find by tag:** with the Manage list showing, hold any tag to the phone to open the spool or filament it is
+  linked to.
+- **Tag audit:** lists the spools whose tags need work: too few tags, tags from version 1.0 that aren't linked,
+  tags still on an archived spool, and tags on spool #1.
+
 ### Tags
 
 Open a spool or filament and its **Tags** section lists every tag Spoolman has linked to it.
@@ -136,6 +159,7 @@ Open a spool or filament and its **Tags** section lists every tag Spoolman has l
 | Spoolman address | Where your Spoolman server is. |
 | Two tags per spool | Write a tag for each flange. On by default. |
 | Link tags in Spoolman | Links every tag you write to its spool in Spoolman, and takes the tag count in the list from there. On by default. |
+| Link tags when reading | On the Read tab, links a tag to the spool it names as soon as you scan it, if Spoolman doesn't have it yet. Never moves a tag from another spool. Off by default. |
 | Keep screen on | Stops the display sleeping while you write or read tags. On by default. |
 | Close "Done" screen automatically | After the last tag, returns to the list after Off / 3 / 5 / 10 seconds. The Done button shows the countdown and still works. |
 | Confirm before overwriting | Ask before replacing a tag that already has data. On by default. |

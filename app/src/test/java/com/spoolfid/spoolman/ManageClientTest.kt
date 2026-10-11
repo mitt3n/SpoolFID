@@ -242,4 +242,19 @@ class ManageClientTest {
         client.unlinkFilamentTag(3, "AA11BB22")
         assertEquals("/api/v1/filament/3/tag/AA11BB22", fake.requests.single().path)
     }
+
+    @Test
+    fun weighingInSendsTheGrossWeight() {
+        fake.respond("PUT /api/v1/spool/7/measure", 200 to spoolJson())
+        val s = client.measureSpool(7, 812.5)
+        assertEquals(812.5, JSONObject(fake.lastBody("PUT", "/api/v1/spool/7/measure")).getDouble("weight"), 0.0)
+        assertEquals(640.5, s.remainingWeight!!, 0.0)
+    }
+
+    @Test
+    fun weighingInFailsClearlyWhenTheSpoolWeightIsUnknown() {
+        fake.respond("PUT /api/v1/spool/7/measure", 400 to """{"message":"Spool weight is not set"}""")
+        val e = assertThrows(SpoolmanException::class.java) { client.measureSpool(7, 800.0) }
+        assertEquals("Spoolman returned HTTP 400: Spool weight is not set", e.message)
+    }
 }

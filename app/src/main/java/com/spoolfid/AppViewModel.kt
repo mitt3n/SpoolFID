@@ -113,6 +113,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var url by mutableStateOf(settings.spoolmanUrl)
     var linkTags by mutableStateOf(settings.linkTags); private set
     var confirmOverwrite by mutableStateOf(settings.confirmOverwrite); private set
+    var autoLink by mutableStateOf(settings.autoLink); private set
+    var extra by mutableStateOf(ExtraFilters()); private set
     var twoTagsPerSpool by mutableStateOf(settings.twoTagsPerSpool); private set
     var keepScreenOn by mutableStateOf(settings.keepScreenOn); private set
     var doneCloseSeconds by mutableStateOf(settings.doneCloseSeconds); private set
@@ -223,6 +225,29 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         settings.twoTagsPerSpool = v
     }
 
+    fun updateAutoLink(v: Boolean) {
+        autoLink = v
+        settings.autoLink = v
+    }
+
+    fun updateExtra(f: ExtraFilters) {
+        extra = f
+    }
+
+    /** What would go wrong printing this spool, for the "needs attention" filter and badges. */
+    fun problemsOf(spool: Spool): List<String> = catalog.problems(spool)
+
+    fun attentionCount(): Int = spools.count { problemsOf(it).isNotEmpty() }
+
+    fun lowCount(): Int = spools.count { it.isLow }
+
+    /** The materials and locations in use, for the filter menus. */
+    fun materialsInUse(): List<String> = spools.mapNotNull { it.material?.trim()?.takeIf { m -> m.isNotEmpty() } }.distinctBy { it.lowercase() }.sorted()
+
+    fun locationsInUse(): List<String> = spools.mapNotNull { it.location?.trim()?.takeIf { l -> l.isNotEmpty() } }.distinctBy { it.lowercase() }.sorted()
+
+    fun auditItems(): List<AuditItem> = TagAudit.check(library.spools(), requiredTags)
+
     fun updateConfirmOverwrite(v: Boolean) {
         confirmOverwrite = v
         settings.confirmOverwrite = v
@@ -242,6 +267,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val q = query.trim().lowercase()
         return spools.filter { s ->
             (tagFilter.matches(s.tagCount, requiredTags, s.unlinkedCount) || s.id in selection) &&
+                (!extra.active || s.id in selection || extra.matches(s, catalog.problems(s))) &&
                 (q.isEmpty() || listOfNotNull("#${s.id}", s.title, s.vendor, s.material, s.location)
                     .any { it.lowercase().contains(q) })
         }
@@ -317,6 +343,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         when {
             s != null -> if (s.phase == Phase.WAITING || s.phase == Phase.ERROR || s.phase == Phase.CONFIRM) writeTag(tag, s)
             library.scanTarget != null -> library.onTag(tag.id.toHex())
+            tab == Tab.MANAGE && library.editor == null -> library.findByTag(tag.id.toHex())
             tab == Tab.READ -> readTag(tag)
         }
     }
@@ -410,6 +437,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private fun readTag(tag: Tag) {
         busy = true
         viewModelScope.launch {
+            var linkNow = false
             try {
                 read = ReadState.Reading
                 val result = runCatching { withContext(Dispatchers.IO) { TagIo.read(tag) } }
@@ -422,10 +450,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 feedback(true)
                 val tagSpoolId = (r.contents as? TagContents.Written)?.payload?.spoolId?.takeIf { it >= 1 }
-                read = lookUp(r.uid, r.contents, tagSpoolId)
+                val looked = lookUp(r.uid, r.contents, tagSpoolId)
+                read = looked
+                // Only a tag Spoolman has never seen is linked on its own; one linked elsewhere is left for the user to decide.
+                linkNow = autoLink && looked.canLink && (looked.link as? TagLinkStatus.NotLinked)?.spool != null
             } finally {
                 busy = false
             }
+            if (linkNow) linkReadTag()
         }
     }
 
